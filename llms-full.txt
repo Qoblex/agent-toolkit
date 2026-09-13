@@ -330,6 +330,39 @@ column. Some fields are documented as required in their own description instead:
 array. Treat the validation response as the authority. Send what you believe is a complete
 record, read the `errors` object if it comes back `400`, and add what it names.
 
+**An enum value in the reference is what the document publishes, which is not always what
+the API accepts.** The enum lists in these pages come from the OpenAPI document, and the
+document is generated from the C# type names through a snake_case converter. Where that
+conversion is lossy, the published value is not a value the API will take.
+
+It is provable on the live document rather than a suspicion. `PaymentTerm.type` publishes:
+
+```
+days_net, days_after_e_o_m, days_e_o_m_xth_day
+```
+
+Nobody names an API value `days_after_e_o_m`. Those are `DaysAfterEOM` and `DaysEOMXthDay`
+with the converter splitting the acronym letter by letter, and `CreatePaymentTerm.type` is a
+**request body** field, so a caller following the document sends a value the parser has never
+heard of.
+
+Four values are mangled that obviously. Thirty-one of the seventy-five enum declarations in
+the document are snake_case and share the same origin, so any of them may differ from the
+wire value, and the reporting `report_type` values are the counter-example that they are not
+all wrong: those are real and work as published.
+
+So, in order of reliability:
+
+1. A value you have seen the API **return** in a response is correct. Prefer it.
+2. A value an endpoint's own prose description spells out is usually correct.
+3. A value from the enum list alone is a hint. On a write path, send it once and check the
+   result rather than assuming, because the failure mode here is not always an error: an
+   unparsed value can fall through to a default and give you a record of the wrong type with
+   a `200` and no warning.
+
+This is known and being fixed. Until it is, treat enums on request bodies as the place to
+check first.
+
 **On `405`: updates are often `POST`, not `PUT` or `PATCH`.** `POST /v1/products/{id}` is
 Update Product. `POST /v1/sale_orders/{id}` is Update Sale Order. `POST
 /v1/manufacturing_orders/{id}` is Update Order. Some resources do use `PUT` or `PATCH`, for
