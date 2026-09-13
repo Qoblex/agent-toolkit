@@ -33,34 +33,37 @@ endpoint you are polling before you write the filter:
 
 | Resource | Field to watch | Notes |
 | --- | --- | --- |
+| `SaleOrder` | `updated_at` | Filterable **and** sortable. Confirmed against the source, 2026-09-13. Note the creation timestamp on this endpoint is `created_time`, not `created_at` |
 | `Product` | `updated_at` | |
-| `SaleOrder` | `updated_at` | |
 | `Quote` | `updated_at` | |
 | `PurchaseOrder` | `last_updated_at` on the record, `created_at` documented as filterable | New orders are findable by filter; edits may not be |
 | `ProductBatch` | `updated_at` | |
+
+`GET /v1/sale_orders` is the one most integrations poll, and it is settled: filter and sort
+on `updated_at` and page newest-first. The endpoint's own filter field list in the reference
+is generic, so this is not something the document tells you yet.
 
 Nine schemas carry an `updated_at` and 25 carry a `created_at`, so most resources give you
 something. A resource with neither can only be polled as a full list, and that is a reason
 to poll it rarely.
 
-## Confirm the filter before you rely on it
+## Confirming a filter the reference does not describe
 
-The reference documents the filterable field list for some endpoints and leaves it blank
-for others, `GET /v1/sale_orders` among them. A field the endpoint does not support returns
-`400 Bad Request` rather than quietly ignoring the filter, which makes a one-request probe a
-reliable test:
+The reference lists the filterable fields for some endpoints and leaves the list generic on
+others. Where it is generic, a field the endpoint does not support returns `400 Bad Request`
+rather than quietly ignoring the filter, which makes a one-request probe a reliable test:
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' \
-  'https://api.qoblex.com/v1/sale_orders?filters=updated_at%3E%3D2026-01-01T00:00:00Z' \
+  'https://api.qoblex.com/v1/products?filters=updated_at%3E%3D2026-01-01T00:00:00Z' \
   -H "qoblex-x-api-key: $QOBLEX_API_KEY"
 ```
 
-`200` means the filter is live. `400` means that field is not filterable there and you need
-another approach for that resource. Two endpoints will also tell you outright:
+`200` means the filter is live, `400` means it is not. Do this once while writing the
+integration, not on every run. Two endpoints will also answer outright:
 `GET /v1/variants/filters` and `GET /v1/reporting/filters`.
 
-Do this once while writing the integration, not on every run.
+You do not need to probe `/v1/sale_orders`: see the table above.
 
 ## How often
 

@@ -43,12 +43,15 @@ inferred from how APIs usually work.
    or `PATCH`. There is no rule to infer, so read the method off the reference; guessing
    gets you a `405`.
 
-5. **Filters have their own syntax, and it varies by endpoint.**
+5. **Filters have their own syntax, and there are two of them.**
    `filters=name@=shirt,quantity>10`, where `@=` is contains, `_=` is starts with, and a
-   trailing `*` makes a string match case-insensitive. `?name=shirt` does nothing.
-   `GET /v1/purchase_orders` documents its own dialect: double-quoted string values and
-   `|` as OR between conditions. Filterable fields are listed per endpoint, and an
-   unsupported one returns `400`.
+   trailing `*` makes a string match case-insensitive. `?name=shirt` does nothing. A second
+   dialect is in use on `/v1/purchase_orders`, `/v1/sale_orders`, `/v1/suppliers`,
+   `/v1/batches` and some others: there, string values are double-quoted
+   (`supplier.name@=*"acme"`) and `|` is OR between whole conditions rather than between
+   values for one field. The document does not yet say which endpoint speaks which, so when
+   a filter returns `400` or matches nothing, try the other dialect before concluding the
+   field is unsupported. See [`docs/conventions.md`](docs/conventions.md#there-are-two-filter-engines-and-they-are-not-compatible).
 
 6. **`Authorization: Bearer` is not accepted.** The header is `qoblex-x-api-key`. A request
    with no key comes back carrying `WWW-Authenticate: Bearer`, which is the framework's

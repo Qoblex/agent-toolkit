@@ -105,12 +105,26 @@ Match any of several values with a pipe: `filters=status==open|packed`. Apply on
 across several fields by grouping them: `filters=(name|sku)@=shirt`. Escape a comma or pipe
 inside a value with a backslash: `filters=name@=blue\,large`.
 
-**Filterable fields are per endpoint, and so is the dialect.** The reference page for each
-endpoint lists the fields it accepts, and an unsupported field is a `400`. Some endpoints
-document their own syntax that differs from the general rules above. `GET
-/v1/purchase_orders` is the one to know: it requires string values to be double-quoted
-(`supplier.name@=*"acme"`), and it uses `|` for OR *between conditions* rather than between
-values. When an endpoint states its own rules, follow those.
+### There are two filter engines, and they are not compatible
+
+The operators above are one of two dialects in use. Which one an endpoint speaks is a
+property of how it was built, and the document does not currently say which is which
+(confirmed with the API team, 2026-09-13).
+
+| | Everything above | The second dialect |
+| --- | --- | --- |
+| String values | bare: `name@=shirt` | double-quoted: `supplier.name@=*"acme"` |
+| `\|` means | *any of these values* for one field: `status==open\|packed` | *OR between whole conditions* |
+| Known endpoints | most of the API | `/v1/purchase_orders`, `/v1/sale_orders`, `/v1/suppliers`, `/v1/batches`, and some others |
+
+That list of second-dialect endpoints is the confirmed part, not the complete part. If an
+endpoint documents its own syntax on its reference page, follow that page. If it does not
+and your filter returns `400` or silently matches nothing, try the other dialect before
+concluding the field is unsupported.
+
+This matters more than a missing field list: a reader who follows the general rules on a
+second-dialect endpoint writes a filter that parses, runs, and means something other than
+what they wrote.
 
 Check the endpoint's own page before you guess a field name. `updated_at` exists on
 `SaleOrder` and `Product`; `PurchaseOrder` calls the same idea `last_updated_at` and
