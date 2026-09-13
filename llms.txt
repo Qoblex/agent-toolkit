@@ -1,0 +1,36 @@
+# Qoblex API
+
+> Qoblex is an inventory, order and production management system for small and mid-sized
+> product businesses. Its v1 REST API covers products and stock, sale orders, shipments,
+> purchasing, goods receipts, bills, manufacturing, batch and lot traceability, custom
+> fields and reporting. This documents the endpoints an integration calls. Authentication is a single
+> `qoblex-x-api-key` header. The rate limit is 30 requests per 60 seconds, list pages are
+> zero-based, and webhooks are announced but not yet in v1.
+
+Base URL: https://api.qoblex.com, every path under /v1.
+OpenAPI 3.0.1: https://api.qoblex.com/swagger/v1/swagger.json
+
+## Start here
+
+- [Agent brief](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/AGENTS.md): base URL, auth, the rate limit, and the eight mistakes that cost an afternoon.
+- [Authentication](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/authentication.md): creating a key, sending it, scopes, and why the 401 mentions Bearer.
+- [Conventions](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/conventions.md): paging, filtering, sorting, expanding, errors, rate limits, dates, versioning.
+- [Finding out what changed](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/changes.md): the polling pattern to use until webhooks ship.
+
+## Reference
+
+- [Every endpoint](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/reference/index.md): all 197 integration endpoints in one table.
+- [List envelopes and paging](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/reference/envelopes.md): which key holds the records, per endpoint.
+- [Full reference in one file](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/llms-full.txt): every group, every operation, every field.
+
+## Examples
+
+- [Working scripts](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/examples/README.md): low stock, expiring batches, change polling, drafting purchase orders.
+- [API client](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/examples/lib/qoblex.mjs): zero-dependency Node, handles pacing, backoff and paging.
+- [Claude skill](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/skills/qoblex/SKILL.md): drop-in skill for Claude Code and claude.ai.
+
+## Optional
+
+- [Product overview](https://qoblex.com/api/): what the API is for, in plain terms.
+- [Interactive reference](https://api.qoblex.com/): the same endpoints with a request runner.
+- [Pricing](https://qoblex.com/pricing/): API access is a paid add-on, included on Scale.

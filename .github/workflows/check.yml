@@ -1,0 +1,20 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Exercises the client against a stub of every response shape the API uses: all four
+      # paging schemes, the bare-array endpoints, the 429 Retry-After path and a validation
+      # error. A paging bug here is a bug in every example at once.
+      - run: npm test

@@ -1,0 +1,19 @@
+{
+  "name": "@qoblex/agent-toolkit",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Build inventory and order management agents on the Qoblex API",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "demo": "node tools/demo-server.mjs",
+    "test": "node tools/test-client.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qoblex/agent-toolkit"
+  },
+  "license": "MIT"
+}
