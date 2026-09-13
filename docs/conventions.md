@@ -131,6 +131,19 @@ Every other filterable list endpoint uses the first dialect, the one the operato
 above describes. If an endpoint documents its own syntax on its reference page, follow that
 page.
 
+**The dialect belongs to the endpoint, not to the record.** The clearest case is the sale
+order, which two endpoints expose through two different engines, with two different names
+for the same timestamp:
+
+| Endpoint | Dialect | Creation timestamp |
+| --- | --- | --- |
+| `GET /v1/sale_orders` | second | `created_time`, and `created_at` is **not** accepted |
+| `GET /v1/quotes` | first | `created_at` |
+
+Both are correct for the endpoint they belong to. So "a sale order filters on `created_at`"
+is not a true or false statement until you say which endpoint, and carrying a field name
+from one of these to the other is a `400` at best and a silently empty result at worst.
+
 This matters more than a missing field list: a reader who follows the general rules on a
 second-dialect endpoint writes a filter that parses, runs, and means something other than
 what they wrote.
