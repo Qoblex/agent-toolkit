@@ -15,6 +15,7 @@ OpenAPI 3.0.1: https://api.qoblex.com/swagger/v1/swagger.json
 - [Agent brief](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/AGENTS.md): base URL, auth, the rate limit, and the eight mistakes that cost an afternoon.
 - [Authentication](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/authentication.md): creating a key, sending it, scopes, and why the 401 mentions Bearer.
 - [Conventions](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/conventions.md): paging, filtering, sorting, expanding, errors, rate limits, dates, versioning.
+- [Reporting](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/reporting.md): the four report endpoints, report_type, dimensions, and the questions people actually ask.
 - [Finding out what changed](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/changes.md): the polling pattern to use until webhooks ship.
 
 ## Reference

@@ -18,6 +18,7 @@ sale orders, shipments, purchasing, goods receipts, bills, manufacturing, batche
 | --- | --- |
 | [authentication.md](authentication.md) | Getting a key, sending it, and the two ways it fails |
 | [conventions.md](conventions.md) | Paging, filtering, sorting, expanding, errors, rate limits |
+| [reporting.md](reporting.md) | The four report endpoints, and the questions people actually ask |
 | [changes.md](changes.md) | Finding out what changed, while webhooks are still to come |
 | [reference/index.md](reference/index.md) | Every endpoint, one table |
 | [reference/envelopes.md](reference/envelopes.md) | Which key holds the records, per list endpoint |

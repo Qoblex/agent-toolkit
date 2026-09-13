@@ -115,12 +115,21 @@ property of how it was built, and the document does not currently say which is w
 | --- | --- | --- |
 | String values | bare: `name@=shirt` | double-quoted: `supplier.name@=*"acme"` |
 | `\|` means | *any of these values* for one field: `status==open\|packed` | *OR between whole conditions* |
-| Known endpoints | most of the API | `/v1/purchase_orders`, `/v1/sale_orders`, `/v1/suppliers`, `/v1/batches`, and some others |
+| Endpoints | every other filterable list | the eight below |
 
-That list of second-dialect endpoints is the confirmed part, not the complete part. If an
-endpoint documents its own syntax on its reference page, follow that page. If it does not
-and your filter returns `400` or silently matches nothing, try the other dialect before
-concluding the field is unsupported.
+The eight on the second dialect, and this list is complete (confirmed against the API
+source, 2026-09-13):
+
+```
+GET /v1/purchase_orders          GET /v1/manufacturing_orders
+GET /v1/sale_orders              GET /v1/tax_classes
+GET /v1/suppliers                GET /v1/account/locations
+GET /v1/batches                  GET /v1/settings/document_templates
+```
+
+Every other filterable list endpoint uses the first dialect, the one the operator table
+above describes. If an endpoint documents its own syntax on its reference page, follow that
+page.
 
 This matters more than a missing field list: a reader who follows the general rules on a
 second-dialect endpoint writes a filter that parses, runs, and means something other than
