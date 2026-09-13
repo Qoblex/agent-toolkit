@@ -242,8 +242,28 @@ So, in order of reliability:
    unparsed value can fall through to a default and give you a record of the wrong type with
    a `200` and no warning.
 
-This is known and being fixed. Until it is, treat enums on request bodies as the place to
+This is known and filed. Until it is fixed, treat enums on request bodies as the place to
 check first.
+
+### One live instance, because it costs you data rather than an error
+
+`POST /v1/purchase_orders` takes a `type`, and the reference documents two values for it,
+`Regular Order` and `Freight Order`. **Neither is accepted** (checked 2026-09-13). They are
+parsed against identifiers that contain no spaces, so both fail to match and fall through to
+the regular-order default.
+
+The result is a purchase order of the wrong type, returned with `200` and no warning. If you
+have been creating freight orders through the API by following the documentation, they are
+regular orders, and nothing will have told you.
+
+The accepted value is the spelling the API itself uses. To find it without guessing, create
+one freight purchase order in the Qoblex web app, read it back through
+`GET /v1/purchase_orders/{id}`, and use the `type` exactly as it comes back. That is the
+rule from the list above, rank 1: a value you have seen the API return is correct, and here
+it is the only source that is.
+
+Worth doing rather than copying a value from here, because this field is being remodelled
+and the spelling may change with it.
 
 **On `405`: updates are often `POST`, not `PUT` or `PATCH`.** `POST /v1/products/{id}` is
 Update Product. `POST /v1/sale_orders/{id}` is Update Sale Order. `POST
