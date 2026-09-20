@@ -32,6 +32,12 @@ totals. Ask only for what you will read.
 `group_by`, `sort_by`, `dim_filters` and `fact_filters` accept a fixed set of values per
 report, and none of those sets is published. They are not free text.
 
+**These four exist only here.** The reporting endpoints read a reporting model rather than
+the operational tables, which is why they filter by dimension and fact rather than by
+column, and why none of the other 20 list endpoints accepts any of them. Those take
+`filters` against their own fields instead. A dimension name and a column name are not
+interchangeable in either direction.
+
 **`GET /v1/reporting/filters` is the endpoint that would answer this, and it returns `500`
 on every input** (checked 2026-09-20, with and without `type`, on every documented value).
 

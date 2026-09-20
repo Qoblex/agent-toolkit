@@ -44,7 +44,11 @@ inferred from how APIs usually work.
    or `PATCH`. There is no rule to infer, so read the method off the reference; guessing
    gets you a `405`.
 
-5. **Filters have their own syntax, and there are two of them.**
+5. **There are two filtering systems, then two syntaxes inside one of them.** The four
+   `/v1/reporting/` endpoints take `dim_filters` and `fact_filters` against a reporting
+   model, with field names from the report's row schema. The other 20 list endpoints take
+   `filters` against their own fields. No endpoint takes both, and a name from one is
+   meaningless in the other. Within `filters`, the syntax splits again:
    `filters=name@=shirt,quantity>10`, where `@=` is contains, `_=` is starts with, and a
    trailing `*` makes a string match case-insensitive. `?name=shirt` does nothing. A second
    dialect is in use on ten endpoints (`purchase_orders`, `sale_orders`, `suppliers`,

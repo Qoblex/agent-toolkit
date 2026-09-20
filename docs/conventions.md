@@ -89,6 +89,25 @@ common way code that worked yesterday breaks on a new resource today.
 
 ## Filtering
 
+**There are two filtering systems, and they share nothing but the idea.** Which one an
+endpoint takes is decided by the parameter name, and no endpoint takes both:
+
+| | `filters` | `dim_filters` / `fact_filters` |
+| --- | --- | --- |
+| Endpoints | the 20 list endpoints | the 4 under `/v1/reporting/` |
+| Reads | the operational database, the same columns the record carries | the reporting model |
+| Field names | the endpoint's own fields (`receiving_status`, `supplier.name`) | the report's row schema (`record_date`, `closing_balance`) |
+| Listed in | the endpoint's `filters` description, where it has one | the `oneOf` row variant for that `report_type` |
+
+Do not carry a field name from one to the other. `record_date` is not a column on a
+purchase order, and `receiving_status` is not a reporting dimension. A wrong name fails
+differently in each: `filters` gives you a `400`, `dim_filters` gives you a `200` and
+silently ignores it.
+
+The rest of this section is about `filters`. The reporting pair is covered in
+[reporting.md](reporting.md#dimensions-not-in-the-document-and-not-discoverable-either).
+
+
 Pass `filters` as a comma-separated list of conditions, combined with AND:
 
 ```text
