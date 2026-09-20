@@ -446,8 +446,23 @@ report, and none of those sets is published. They are not free text.
 
 **`GET /v1/reporting/filters` is the endpoint that would answer this, and it returns `500`
 on every input** (checked 2026-09-20, with and without `type`, on every documented value).
-So there is currently no way to discover a valid dimension. Treat the reports as usable
-without dimensions until that is fixed.
+
+**The row schema is the answer instead**, and it works today: the fields a report filters on
+are the fields it returns. `stock_movement` returns `StockMovementLineItem`, so `record_date`
+and `closing_balance` are valid, and both are accepted:
+
+```text
+GET /v1/reporting/inventory?report_type=stock_movement
+    &dim_filters=record_date>=2025-09-01T00:00:00Z , record_date<=2025-10-01T00:00:00Z
+```
+
+28,170 rows down to 1,627 on a live account. `fact_filters=closing_balance>0` narrows the
+same report to 9,281. Note the spaces around the comma: these take the second filter
+dialect, and a bare `,` is a `422`.
+
+So read the variant for your `report_type` in [the reference](reference/reporting.md), and
+use its field names. What you cannot get that way is `group_by`, whose accepted values are
+neither published nor derivable.
 
 Three behaviours to know while it is, because they differ and only one of them tells you
 anything:
@@ -455,12 +470,13 @@ anything:
 | | |
 | --- | --- |
 | `group_by` with a bad or unsupported value | `422`, with a useful message: `Grouping is not supported for Inventory Reorder Report.` |
+| `dim_filters` with a field from the row schema | works, and narrows `count` |
 | `dim_filters` with a nonsense field | **`200`, silently ignored.** You get an unfiltered report that looks filtered |
 | `sort_by` with a field the endpoint lacks | `204`, no body at all. Your result set is empty and nothing says why |
 
 The middle one is the dangerous one: a report you believe is scoped to a warehouse or a
-brand, and is not, reads as a plausible answer. Until the dimensions are published, check a
-`dim_filters` expression changes `count` before trusting it.
+brand, and is not, reads as a plausible answer. So check a `dim_filters` expression actually changes `count` before trusting it. That one
+comparison separates a filter that worked from one that was thrown away.
 
 `GET /v1/variants/filters` does work, and answers for variants rather than reports: passing
 no `type` returns a `400` naming its own supported values (`suppliers`, `product_types`,
