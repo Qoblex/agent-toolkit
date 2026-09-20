@@ -7,7 +7,7 @@ sale orders, shipments, purchasing, goods receipts, bills, manufacturing, batche
 - **Base URL** `https://api.qoblex.com`, every path under `/v1`.
 - **Auth** one header, `qoblex-x-api-key`. See [authentication](authentication.md).
 - **Shape** REST, JSON in and JSON out, standard verbs and status codes.
-- **Size** 197 operations over 156 paths in 30 resource groups.
+- **Size** 201 operations over 160 paths in 30 resource groups.
 - **Machine-readable** the OpenAPI 3.0.1 document is at
   [`/swagger/v1/swagger.json`](https://api.qoblex.com/swagger/v1/swagger.json), and a copy
   is committed here at [`spec/openapi.json`](../spec/openapi.json).

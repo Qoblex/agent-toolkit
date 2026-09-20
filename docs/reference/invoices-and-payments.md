@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 3 endpoints.
 
@@ -72,9 +72,9 @@ once it's ready to count toward payment and reporting.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -193,9 +193,9 @@ base currency.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |

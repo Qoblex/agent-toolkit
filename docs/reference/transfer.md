@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 3 endpoints.
 
@@ -33,7 +33,7 @@ the transfer is authorized.
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the created transfer. |
 | `number` | string |  | Human-readable reference for the transfer, for example `TR-000000123`. |
-| `status` | enum(`draft`, `received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
+| `status` | enum(`Draft`, `Received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
 | `source_location` | string |  | Name of the location stock is being transferred from. |
 | `destination_location` | string |  | Name of the location stock is being transferred to. |
 | `transfer_date` | string (date-time) |  | Date and time when the transfer was created. |
@@ -66,7 +66,7 @@ assign the batches being shipped via `POST /{id}/batches` before authorizing.
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the created transfer. |
 | `number` | string |  | Human-readable reference for the transfer, for example `TR-000000123`. |
-| `status` | enum(`draft`, `received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
+| `status` | enum(`Draft`, `Received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
 | `source_location` | string |  | Name of the location stock is being transferred from. |
 | `destination_location` | string |  | Name of the location stock is being transferred to. |
 | `transfer_date` | string (date-time) |  | Date and time when the transfer was created. |

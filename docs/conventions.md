@@ -43,7 +43,7 @@ There are three exceptions, and they are not guessable:
 
 | Shape | Where | How |
 | --- | --- | --- |
-| `page`, zero-based | 20 endpoints, including all the main collections | `?page=0`, then `1`, `2` |
+| `page`, zero-based | 22 endpoints, including all the main collections | `?page=0`, then `1`, `2` |
 | `page` + `page_size` | `/v1/activity` | set the size yourself |
 | `limit` + `offset` | `/v1/products/{id}/variants` | advance `offset` by the records returned |
 | `offset` | `/v1/products/overview` | same, with the size fixed by the server |
@@ -117,14 +117,16 @@ property of how it was built, and the document does not currently say which is w
 | `\|` means | *any of these values* for one field: `status==open\|packed` | *OR between whole conditions* |
 | Endpoints | every other filterable list | the eight below |
 
-The eight on the second dialect, and this list is complete (confirmed against the API
-source, 2026-09-13):
+The ten on the second dialect. Eight were confirmed against the API source on 2026-09-13;
+the two search endpoints added since name their engine in their own description:
 
 ```
 GET /v1/purchase_orders          GET /v1/manufacturing_orders
 GET /v1/sale_orders              GET /v1/tax_classes
 GET /v1/suppliers                GET /v1/account/locations
 GET /v1/batches                  GET /v1/settings/document_templates
+GET /v1/purchase_orders/linkable_orders
+GET /v1/sale_orders/linkable_orders
 ```
 
 Every other filterable list endpoint uses the first dialect, the one the operator table
@@ -205,65 +207,45 @@ each rejected field:
 
 Read `errors` and fix the named field. Do not retry an unchanged `400`.
 
-**A blank "Required" column means unknown, not optional.** Only 6 of the 355 schemas in the
+**A blank "Required" column means unknown, not optional.** Only 6 of the 361 schemas in the
 spec declare a `required` list, so the generated reference has almost nothing to put in that
 column. Some fields are documented as required in their own description instead:
 `billing_location_id` on a purchase order says so in prose and is not in any `required`
 array. Treat the validation response as the authority. Send what you believe is a complete
 record, read the `errors` object if it comes back `400`, and add what it names.
 
-**An enum value in the reference is what the document publishes, which is not always what
-the API accepts.** The enum lists in these pages come from the OpenAPI document, and the
-document is generated from the C# type names through a snake_case converter. Where that
-conversion is lossy, the published value is not a value the API will take.
+**An enum value is now the value the API uses, and that is recent.** The enum lists in
+these pages come from the OpenAPI document, which is generated from the API's own types.
+Until September 2026 that generation mangled the names on the way out, so the document
+published values the API had never accepted. It was fixed wholesale: the document now
+publishes the wire spelling, and where legacy spellings are still taken the endpoint says so
+outright, as `POST /v1/purchase_orders` does for its `type`.
 
-It is provable on the live document rather than a suspicion. `PaymentTerm.type` publishes:
+Two conventions coexist in the result, which is untidy rather than wrong. Most enums are
+`PascalCase` (`RegularPO`, `AwaitingStock`, `GoodsReceiptNote`); a handful are snake_case
+(`ProductVariant.type` is `simple`, `bundle`, `bill_of_material`, and the reporting
+`report_type` values are `stock_on_hand`, `inventory_reorder` and so on). Copy the spelling
+from the endpoint you are calling rather than converting it to the one you saw last.
 
-```
-days_net, days_after_e_o_m, days_e_o_m_xth_day
-```
+If a value is ever refused, a value you have seen the API **return** is the one to trust.
+That was the whole rule while the document could not be relied on, and it is still the
+cheapest way to settle a disagreement.
 
-Nobody names an API value `days_after_e_o_m`. Those are `DaysAfterEOM` and `DaysEOMXthDay`
-with the converter splitting the acronym letter by letter, and `CreatePaymentTerm.type` is a
-**request body** field, so a caller following the document sends a value the parser has never
-heard of.
+### If you created freight purchase orders before September 2026, check them
 
-Four values are mangled that obviously. Thirty-one of the seventy-five enum declarations in
-the document are snake_case and share the same origin, so any of them may differ from the
-wire value, and the reporting `report_type` values are the counter-example that they are not
-all wrong: those are real and work as published.
+`POST /v1/purchase_orders` takes a `type`, and the reference used to document two values for
+it, `Regular Order` and `Freight Order`. Neither was accepted. Both were parsed against
+identifiers containing no spaces, so both failed to match and fell through to the
+regular-order default, returning `200` with no warning.
 
-So, in order of reliability:
+This is fixed. `type` now publishes `RegularPO`, `FreightPO` and `DropShipPo`, the legacy
+spellings with spaces are accepted as well, and an unrecognised value is rejected rather
+than quietly becoming a regular order.
 
-1. A value you have seen the API **return** in a response is correct. Prefer it.
-2. A value an endpoint's own prose description spells out is usually correct.
-3. A value from the enum list alone is a hint. On a write path, send it once and check the
-   result rather than assuming, because the failure mode here is not always an error: an
-   unparsed value can fall through to a default and give you a record of the wrong type with
-   a `200` and no warning.
-
-This is known and filed. Until it is fixed, treat enums on request bodies as the place to
-check first.
-
-### One live instance, because it costs you data rather than an error
-
-`POST /v1/purchase_orders` takes a `type`, and the reference documents two values for it,
-`Regular Order` and `Freight Order`. **Neither is accepted** (checked 2026-09-13). They are
-parsed against identifiers that contain no spaces, so both fail to match and fall through to
-the regular-order default.
-
-The result is a purchase order of the wrong type, returned with `200` and no warning. If you
-have been creating freight orders through the API by following the documentation, they are
-regular orders, and nothing will have told you.
-
-The accepted value is the spelling the API itself uses. To find it without guessing, create
-one freight purchase order in the Qoblex web app, read it back through
-`GET /v1/purchase_orders/{id}`, and use the `type` exactly as it comes back. That is the
-rule from the list above, rank 1: a value you have seen the API return is correct, and here
-it is the only source that is.
-
-Worth doing rather than copying a value from here, because this field is being remodelled
-and the spelling may change with it.
+The bug is gone; its output is not. **Purchase orders raised through the API as freight
+before this shipped are regular orders in your data**, and nothing ever raised an error to
+say so. If you run an integration that creates freight POs, it is worth checking what type
+they actually carry.
 
 **On `405`: updates are often `POST`, not `PUT` or `PATCH`.** `POST /v1/products/{id}` is
 Update Product. `POST /v1/sale_orders/{id}` is Update Sale Order. `POST

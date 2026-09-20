@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 4 endpoints.
 

@@ -1,6 +1,6 @@
 # Endpoint index
 
-Every endpoint in Qoblex API v1: 197 across 30 resource groups.
+Every endpoint in Qoblex API v1: 201 across 30 resource groups.
 Generated from the OpenAPI document. Do not edit by hand.
 
 | Method | Path | Summary | Group |
@@ -83,6 +83,8 @@ Generated from the OpenAPI document. Do not edit by hand.
 | `POST` | `/v1/manufacturing_orders/{id}/start` | Start Order | [Manufacturing Orders](manufacturing-orders.md) |
 | `POST` | `/v1/manufacturing_orders/{id}/stop` | Stop Order | [Manufacturing Orders](manufacturing-orders.md) |
 | `GET` | `/v1/price_lists` | List Price Lists | [Price Lists](price-lists.md) |
+| `POST` | `/v1/price_lists/csv` | Import Price Lists CSV | [Price Lists](price-lists.md) |
+| `POST` | `/v1/price_lists/export` | Export Price Lists CSV | [Price Lists](price-lists.md) |
 | `POST` | `/v1/variants/prices` | Update Prices | [Price Lists](price-lists.md) |
 | `GET` | `/v1/products` | List Products | [Product](product.md) |
 | `POST` | `/v1/products` | Create Product | [Product](product.md) |
@@ -117,6 +119,7 @@ Generated from the OpenAPI document. Do not edit by hand.
 | `POST` | `/v1/purchase_orders/bulk` | Create Purchase Orders | [Purchase Orders](purchase-orders.md) |
 | `POST` | `/v1/purchase_orders/bulk/csv` | Bulk-create Purchase Orders from a CSV file | [Purchase Orders](purchase-orders.md) |
 | `GET` | `/v1/purchase_orders/bulk/csv/template` | Download the bulk Purchase Order import CSV template | [Purchase Orders](purchase-orders.md) |
+| `GET` | `/v1/purchase_orders/linkable_orders` | Search Linkable Orders | [Purchase Orders](purchase-orders.md) |
 | `GET` | `/v1/purchase_orders/open_purchases` | List Open Purchase Orders | [Purchase Orders](purchase-orders.md) |
 | `GET` | `/v1/quotes` | List Quotes | [Quotes](quotes.md) |
 | `POST` | `/v1/sale_orders/{id}/refunds` | Create Refund | [Refunds & Returns](refunds-and-returns.md) |
@@ -157,6 +160,7 @@ Generated from the OpenAPI document. Do not edit by hand.
 | `POST` | `/v1/sale_orders/export` | Export Sale Orders | [Sale Orders](sale-orders.md) |
 | `POST` | `/v1/sale_orders/import` | Import Sale Orders | [Sale Orders](sale-orders.md) |
 | `POST` | `/v1/sale_orders/import_from_channel` | Import Sale Orders from Channel | [Sale Orders](sale-orders.md) |
+| `GET` | `/v1/sale_orders/linkable_orders` | Search Linkable Orders | [Sale Orders](sale-orders.md) |
 | `GET` | `/v1/sale_orders/preview_purchase_orders` | Preview Purchase Orders From Sale Orders | [Sale Orders](sale-orders.md) |
 | `POST` | `/v1/sale_orders/print_packing_slips` | Print Packing Slips | [Sale Orders](sale-orders.md) |
 | `POST` | `/v1/sale_orders/ship` | Ship Sale Orders | [Sale Orders](sale-orders.md) |

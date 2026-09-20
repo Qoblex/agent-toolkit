@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 5 endpoints.
 
@@ -78,7 +78,7 @@ list to only locations available on purchase orders, or only those allowed to ho
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the location. |
 | `name` | string |  | Name of the location. |
-| `type` | enum(`warehouse`, `billing`, `dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
+| `type` | enum(`Warehouse`, `Billing`, `Dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
 | `available_in_purchase_orders` | boolean |  | Whether this location can be used in purchase orders. |
 | `address` | LocationAddress |  | The location's address. |
 
@@ -104,7 +104,7 @@ Retrieves the details of a single location by its identifier, such as its name, 
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the location. |
 | `name` | string |  | Name of the location. |
-| `type` | enum(`warehouse`, `billing`, `dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
+| `type` | enum(`Warehouse`, `Billing`, `Dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
 | `available_in_purchase_orders` | boolean |  | Whether this location can be used in purchase orders. |
 | `address` | LocationAddress |  | The location's address. |
 

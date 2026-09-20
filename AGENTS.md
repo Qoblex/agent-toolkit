@@ -1,7 +1,7 @@
 # Qoblex API: a brief for coding agents
 
 You are working against the Qoblex API v1. Qoblex is an inventory, order and production
-system. This file is the short version: enough to write correct code without reading 197
+system. This file is the short version: enough to write correct code without reading 201
 endpoint definitions first. The long version is in [`docs/`](docs/).
 
 ```
@@ -9,7 +9,7 @@ Base URL   https://api.qoblex.com      every path under /v1
 Auth       qoblex-x-api-key: <key>     one header, no OAuth, no expiry
 Limit      30 requests / 60 seconds    per key
 Paging     page=0 is the first page    up to 50 records
-Spec       spec/openapi.json           OpenAPI 3.0.1, 197 operations
+Spec       spec/openapi.json           OpenAPI 3.0.1, 201 operations
 ```
 
 Check a key with `GET /v1/users/me`. It is the cheapest call in the API and tells you which
@@ -46,9 +46,10 @@ inferred from how APIs usually work.
 5. **Filters have their own syntax, and there are two of them.**
    `filters=name@=shirt,quantity>10`, where `@=` is contains, `_=` is starts with, and a
    trailing `*` makes a string match case-insensitive. `?name=shirt` does nothing. A second
-   dialect is in use on exactly eight endpoints (`purchase_orders`, `sale_orders`,
-   `suppliers`, `batches`, `manufacturing_orders`, `tax_classes`, `account/locations`,
-   `settings/document_templates`): there, string values are double-quoted
+   dialect is in use on ten endpoints (`purchase_orders`, `sale_orders`, `suppliers`,
+   `batches`, `manufacturing_orders`, `tax_classes`, `account/locations`,
+   `settings/document_templates`, and the two `linkable_orders` searches): there, string
+   values are double-quoted
    (`supplier.name@=*"acme"`) and `|` is OR between whole conditions rather than between
    values for one field. The document itself does not say which endpoint speaks which. See
    [`docs/conventions.md`](docs/conventions.md#there-are-two-filter-engines-and-they-are-not-compatible).
@@ -58,7 +59,7 @@ inferred from how APIs usually work.
    default response and not a description of this API. Ignore it.
 
 7. **Almost nothing is marked required, and that is a gap in the spec rather than a fact
-   about the API.** 6 of 355 schemas declare a `required` list. A field can be mandatory and
+   about the API.** 6 of 361 schemas declare a `required` list. A field can be mandatory and
    say so only in its own description, as `billing_location_id` does on a purchase order.
    Send the record you believe is complete, then read the `errors` object on a `400`: it
    names each rejected field and why. That is the authority, not the column.
@@ -108,6 +109,9 @@ without being able to commit anything.
 | What to reorder, in one row per variant | `GET /v1/reporting/inventory?report_type=inventory_reorder` |
 | Outstanding POs by supplier | `GET /v1/purchase_orders/open_purchases` |
 | Raise POs for a set of sale orders | `GET /v1/sale_orders/preview_purchase_orders`, then `POST /v1/sale_orders/create_purchase_orders` |
+| Drop-ship, freight or regular POs | `GET /v1/purchase_orders?filters=type=="DropShipPo"` |
+| Find an order to link by number or contact | `GET /v1/{sale,purchase}_orders/linkable_orders` |
+| Bulk price list import or export | `POST /v1/price_lists/csv`, `POST /v1/price_lists/export` |
 | Channel listing mapping | `GET /v1/variants/external_links`, `/v1/products/{id}/external_links` |
 
 Full table: [`docs/reference/index.md`](docs/reference/index.md). The reporting endpoints

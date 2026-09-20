@@ -6,7 +6,7 @@ description: Read and change inventory, stock, orders, purchasing, shipments, ba
 # Qoblex API v1
 
 Qoblex is an inventory, order and production system. This skill covers its v1 REST API:
-197 endpoints, the surface an integration calls.
+201 endpoints, the surface an integration calls.
 
 ## Before the first call
 
@@ -44,7 +44,7 @@ The records come back under a different key per endpoint (`products`, `sale_orde
    here" fail rather than merely be slow. One list call with `expand=` beats fifty
    retrieves.
 3. **Read the `400`.** Validation failures name each rejected field in an `errors` object.
-   Only 6 of 355 schemas declare their required fields, so the error is the specification.
+   Only 6 of 361 schemas declare their required fields, so the error is the specification.
 4. **Never print or log the key**, and never write it into a file you create.
 
 ## Ask before committing anything
@@ -66,7 +66,7 @@ it. These are not, and want explicit confirmation each time:
 | Stock by location | `GET /v1/variants/{id}/inventory`, or `GET /v1/variants?expand=locations` |
 | Catalog out | `GET /v1/products?expand=variants` |
 | Order in | `POST /v1/sale_orders`, then `/allocate`, `/shipments`, `/dispatch` |
-| Purchasing | `POST /v1/purchase_orders`, or `/bulk/csv`, then `/approve` |
+| Purchasing | `POST /v1/purchase_orders` (`type`: `RegularPO`, `FreightPO`, `DropShipPo`), or `/bulk/csv`, then `/approve` |
 | Receiving | `POST /v1/purchase_orders/{id}/goods_receipt_notes`, then `/authorize` |
 | Supplier invoices | `POST .../bills`, `/authorize`, `.../payments` |
 | Stocktake | `POST /v1/adjustments/stocktake/csv`, `/reconcile`, `/authorize` |
@@ -77,7 +77,7 @@ it. These are not, and want explicit confirmation each time:
 
 ## Reference
 
-- `docs/reference/index.md`: all 197 endpoints
+- `docs/reference/index.md`: all 201 endpoints
 - `docs/reference/envelopes.md`: the response key and paging style per list endpoint
 - `docs/conventions.md`: paging, filtering, expanding, errors, rate limits
 - `docs/changes.md`: polling until webhooks ship

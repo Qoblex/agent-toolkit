@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 9 endpoints.
 
@@ -50,7 +50,7 @@ details your business tracks that the standard record does not hold.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `owner_type` | enum(`order`, `product`, `contact`) |  | Type of entity the custom field belongs to. |
+| `owner_type` | enum(`Order`, `Product`, `Contact`) |  | Type of entity the custom field belongs to. |
 | `owner_id` | integer (int32) |  | Identifier of the entity the custom field is attached to. |
 | `key` | string |  | Internal key or name of the custom field. |
 | `value` | string |  | Value to store in the custom field. |
@@ -115,7 +115,7 @@ your team has already defined to the records where you want to capture their val
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `owner_type` | enum(`order`, `product`, `contact`) |  | Type of entity the custom fields will be assigned to. |
+| `owner_type` | enum(`Order`, `Product`, `Contact`) |  | Type of entity the custom fields will be assigned to. |
 | `owner_id` | integer (int32) |  | Identifier of the entity receiving the custom fields. |
 
 **Response** `200`
@@ -189,7 +189,7 @@ The key must be unique for that record type.
 | `value_type` | string |  | Data type of the field. |
 | `namespace` | string |  | Namespace used to group custom fields logically. |
 | `options` | string |  | Available options for dropdown-type fields. |
-| `owner_type` | enum(`order`, `product`, `contact`) |  | Entity type this field belongs to. |
+| `owner_type` | enum(`Order`, `Product`, `Contact`) |  | Entity type this field belongs to. |
 | `is_editable` | boolean |  | Indicates whether the field can be edited by users. |
 
 **Response** `200` `CustomField`

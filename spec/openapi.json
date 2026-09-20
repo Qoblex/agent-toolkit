@@ -858,7 +858,7 @@
           "Adjustment"
         ],
         "summary": "Reconcile Adjustment",
-        "description": "Reconciles a stocktake by writing the final approved quantity for one or more selected\r\nline items, turning raw scanner counts into the numbers you will post. Scanner counts are\r\npreserved as audit history and are not modified.\r\nOnly line items explicitly included in the request are reconciled — others remain unchanged.\r\n<br /><br />\r\nEvery line to reconcile is listed in `items` by `line_item_id`. By default\r\n(`strategy: SetQuantity`) the caller also supplies `final_quantity` per line, as a\r\nsingle admin decision typed for one line at a time. To reconcile several selected lines at\r\nonce without typing a quantity for each one, set `strategy` to `AcceptScanner`,\r\n`Merge`, `AcceptSystem`, or `AcceptSuggestion`; `final_quantity` is then\r\nignored and the final quantity for each line is computed from the scanners' counts instead.\r\nA line that cannot be resolved with the chosen strategy (for example, the chosen scanner\r\nnever counted it) is skipped rather than failing the request, and reported back in\r\n`skipped_lines`.",
+        "description": "Reconciles a stocktake by writing the final approved quantity for one or more selected\r\nline items, turning raw scanner counts into the numbers you will post. Scanner counts are\r\npreserved as audit history and are not modified.\r\nOnly line items explicitly included in the request are reconciled — others remain unchanged.\r\n<br /><br />\r\nEvery line to reconcile is listed in `items` by `line_item_id`. By default\r\n(`strategy: SetQuantity`) the caller also supplies `final_quantity` per line, as a\r\nsingle admin decision typed for one line at a time. To reconcile several selected lines at\r\nonce without typing a quantity for each one, set `strategy` to `AcceptScanner`,\r\n`Merge`, `AcceptSystem`, `AcceptSuggestion`, `AcceptMin`, or `AcceptMax`;\r\n`final_quantity` is then ignored and the final quantity for each line is computed from the\r\nscanners' counts instead. `Merge` sums the scanners' counts, for stocktakes where each\r\nscanner counted a different part of the location; `AcceptMin` and `AcceptMax` take the\r\nlowest and the highest count, for stocktakes where scanners counted the same stock and disagreed.\r\nA line that cannot be resolved with the chosen strategy (for example, the chosen scanner\r\nnever counted it) is skipped rather than failing the request, and reported back in\r\n`skipped_lines`.",
         "parameters": [
           {
             "name": "id",
@@ -1118,17 +1118,15 @@
           {
             "name": "filters",
             "in": "query",
-            "description": "A filter expression used to narrow the results, for example `name@=shirt,quantity>10`. See the Filtering and sorting section in the API overview for the full list of operators and syntax.",
+            "description": "A filter expression used to narrow the results.<br />\r\nFilterable fields:<br />\r\n- `id`<br />\r\n- `adjustment_id`<br />\r\n- `product_variant.id`, `product_variant.product_id`, `product_variant.name`,\r\n`product_variant.sku`, `product_variant.barcode`, `product_variant.is_batch_tracked`<br />\r\n- `reconciliation_status` — `Pending`, `Resolved` or `Conflict`.<br />\r\n- `previous_quantity`, `quantity`, `previous_cost`, `cost`,\r\n`quantity_variance`, `cost_variance`<br />\r\n- `count_agreement` — `Agreed` or `Disagreed`.<br />",
             "schema": {
-              "type": "string",
-              "example": "reconciliation_status==Pending,product_variant.sku@=adidas"
-            },
-            "example": "reconciliation_status==Pending,product_variant.sku@=adidas"
+              "type": "string"
+            }
           },
           {
             "name": "sort_by",
             "in": "query",
-            "description": "A sort expression: a comma-separated list of fields, each optionally prefixed with `-` for descending order. See the Filtering and sorting section in the API overview.",
+            "description": "A sort expression: a comma-separated list of fields, each optionally prefixed with `-` for\r\ndescending order. `count_agreement` is filter-only and cannot be sorted on.",
             "schema": {
               "type": "string",
               "example": "-quantity,product_variant.name"
@@ -1518,9 +1516,9 @@
             "description": "The tracing direction.",
             "schema": {
               "enum": [
-                "upstream",
-                "downstream",
-                "both"
+                "Upstream",
+                "Downstream",
+                "Both"
               ],
               "type": "string"
             }
@@ -5011,6 +5009,124 @@
         }
       }
     },
+    "/v1/price_lists/export": {
+      "post": {
+        "tags": [
+          "Price Lists"
+        ],
+        "summary": "Export Price Lists CSV",
+        "description": "Prepares a CSV of every product variant pre-filled with its current price in each of your\r\nprice lists, in the background so a large catalog never times out the request. Edit the file\r\nand send it back to `POST /v1/price_lists/csv` to apply your changes. Poll the returned\r\njob via `GET /v1/jobs`; once it completes, the job's output is a signed download URL.",
+        "responses": {
+          "200": {
+            "description": "The export job, in `Queued` status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/price_lists/csv": {
+      "post": {
+        "tags": [
+          "Price Lists"
+        ],
+        "summary": "Import Price Lists CSV",
+        "description": "Uploads a price list CSV and applies it in the background, one page of rows at a time, so a\r\nlarge catalog no longer times out the request. Only prices that differ from what is already\r\nstored are written, so re-sending an unmodified export changes nothing. Rows whose ID does\r\nnot match a product variant on your account are skipped and reported on the finished job.\r\nPoll the returned job via `GET /v1/jobs` to follow progress and completion.",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ContentType": {
+                    "type": "string"
+                  },
+                  "ContentDisposition": {
+                    "type": "string"
+                  },
+                  "Headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "Length": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "Name": {
+                    "type": "string"
+                  },
+                  "FileName": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "ContentType": {
+                  "style": "form"
+                },
+                "ContentDisposition": {
+                  "style": "form"
+                },
+                "Headers": {
+                  "style": "form"
+                },
+                "Length": {
+                  "style": "form"
+                },
+                "Name": {
+                  "style": "form"
+                },
+                "FileName": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The import job, in `Queued` status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file was uploaded.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/variants/prices": {
       "post": {
         "tags": [
@@ -6093,7 +6209,7 @@
           {
             "name": "filters",
             "in": "query",
-            "description": "Filters to apply on the purchase list: property operator value.<br />\r\nSupported properties:<br />\r\n- `id`<br />\r\n- `number`<br />\r\n- `currency`<br />\r\n- `supplier_id`<br />\r\n- `supplier.name`<br />\r\n- `supplier_reference`<br />\r\n- `status`<br />\r\n- `billing_status`<br />\r\n- `receiving_status`<br />\r\n- `sub_type`<br />\r\n- `created_at`<br />\r\n- `estimated_delivery_date`<br />\r\n- `payment_status`<br />\r\n- `location` — the receiving location id.<br />\r\n- `tag`<br />\r\n- `shipped_at` — matches if any linked goods receipt was shipped/received on the given date.<br />\r\n- `deleted` — soft-deleted orders are included by default; filter `deleted==false` to exclude them.<br />\r\nSupported operators:<br />`==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal)\r\n`<=` (less than or equal)<br />\r\nString values must be double-quoted (e.g. `supplier.name@=*\"acme\"`). Combine multiple filters with\r\n`,` (AND) or `|` (OR), with a space on each side of the operator.",
+            "description": "Filters to apply on the purchase list: property operator value.<br />\r\nSupported properties:<br />\r\n- `id`<br />\r\n- `number`<br />\r\n- `currency`<br />\r\n- `supplier_id`<br />\r\n- `supplier.name`<br />\r\n- `supplier_reference`<br />\r\n- `status`<br />\r\n- `billing_status`<br />\r\n- `receiving_status`<br />\r\n- `type` — one of `RegularPO`, `FreightPO`, `DropShipPo`.<br />\r\n- `created_at`<br />\r\n- `estimated_delivery_date`<br />\r\n- `payment_status`<br />\r\n- `location` — the receiving location id.<br />\r\n- `tag`<br />\r\n- `shipped_at` — matches if any linked goods receipt was shipped/received on the given date.<br />\r\n- `deleted` — soft-deleted orders are included by default; filter `deleted==false` to exclude them.<br />\r\nSupported operators:<br />`==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal)\r\n`<=` (less than or equal)<br />\r\nString values must be double-quoted (e.g. `supplier.name@=*\"acme\"`). Combine multiple filters with\r\n`,` (AND) or `|` (OR), with a space on each side of the operator.",
             "schema": {
               "type": "string",
               "example": "status==Open , receiving_status!=FullyReceived"
@@ -6103,7 +6219,7 @@
           {
             "name": "sort_by",
             "in": "query",
-            "description": "Sorting to apply on the purchase list: prefix with - for descending, no prefix for ascending. Multiple sorts can be combined using commas.\r\nDefaults to `-created_at` (newest first) when omitted.<br />\r\nSupported properties:<br /> \r\n- `id`<br />\r\n- `number`<br />\r\n- `currency`<br />\r\n- `supplier.name`<br />\r\n- `supplier_reference`<br />\r\n- `status`<br />\r\n- `billing_status`<br />\r\n- `receiving_status`<br />\r\n- `sub_type`<br />\r\n- `created_at`<br />\r\n- `estimated_delivery_date`<br />\r\n- `payment_status`<br />\r\n- `location`<br />\r\n- `tag`<br />\r\n- `deleted`<br />\r\nSorting is not supported on `supplier_id` or `shipped_at` (a to-many relation).<br />\r\nSupported operators:<br />`name` (ascending), `-name` (descending), `name,-date` (name ascending then date descending)",
+            "description": "Sorting to apply on the purchase list: prefix with - for descending, no prefix for ascending. Multiple sorts can be combined using commas.\r\nDefaults to `-created_at` (newest first) when omitted.<br />\r\nSupported properties:<br /> \r\n- `id`<br />\r\n- `number`<br />\r\n- `currency`<br />\r\n- `supplier.name`<br />\r\n- `supplier_reference`<br />\r\n- `status`<br />\r\n- `billing_status`<br />\r\n- `receiving_status`<br />\r\n- `type`<br />\r\n- `created_at`<br />\r\n- `estimated_delivery_date`<br />\r\n- `payment_status`<br />\r\n- `location`<br />\r\n- `tag`<br />\r\n- `deleted`<br />\r\nSorting is not supported on `supplier_id` or `shipped_at` (a to-many relation).<br />\r\nSupported operators:<br />`name` (ascending), `-name` (descending), `name,-date` (name ascending then date descending)",
             "schema": {
               "type": "string",
               "example": "supplier.name,-created_at"
@@ -6166,7 +6282,7 @@
           {
             "name": "expand",
             "in": "query",
-            "description": "Comma-separated list of related resources to include in the response.<br />\r\nSupported values:<br />\r\n- `supplier` — include the supplier's name on the order.<br />\r\n- `bills` — include the bills linked to the order.<br />\r\n- `grns` — include the goods receipt notes linked to the order.<br />\r\n- `line_items.product_variant` — include each line item's variant details (sku, name, cost, image).<br />\r\n- `drop_ship_order` — for a drop-ship order, include the sale order it was raised for.<br />\r\n- `deposits` — include the supplier deposits recorded against the order.<br />\r\n- `refunds` — include the supplier refunds recorded against the order.<br />\r\n- `supplier_returns` — include the supplier returns linked to the order.<br />",
+            "description": "Comma-separated list of related resources to include in the response.<br />\r\nSupported values:<br />\r\n- `supplier` — include the supplier's name on the order.<br />\r\n- `bills` — include the bills linked to the order.<br />\r\n- `grns` — include the goods receipt notes linked to the order.<br />\r\n- `line_items.product_variant` — include each line item's variant details (sku, name, cost, image).<br />\r\n- `drop_ship_order` — for a drop-ship order, include the sale order it was raised for.<br />\r\n- `deposits` — include the supplier deposits recorded against the order.<br />\r\n- `refunds` — include the supplier refunds recorded against the order.<br />\r\n- `supplier_returns` — include the supplier returns linked to the order.<br />\r\n- `related_orders` — include other orders linked to this order (e.g. a back-order, or the sale order it drop-ships for).<br />",
             "schema": {
               "type": "string",
               "example": "supplier,line_items.product_variant"
@@ -6698,6 +6814,96 @@
         }
       }
     },
+    "/v1/purchase_orders/linkable_orders": {
+      "get": {
+        "tags": [
+          "Purchase Orders"
+        ],
+        "summary": "Search Linkable Orders",
+        "description": "Searches across your sale, purchase, and production orders using a QueryKit `filters` expression\r\n(e.g. matching on `number` or `contact.name`). Use this to find candidate orders to link to a\r\npurchase order, for example a back-order or the sale order it drop-ships for. Restrict to specific order\r\ntypes and exclude ids (typically the purchase order you're linking from, plus any orders already linked\r\nto it) to narrow the results to orders that are actually eligible to be linked.",
+        "parameters": [
+          {
+            "name": "filters",
+            "in": "query",
+            "description": "Filters to apply to the search: property operator value.<br />\r\nSupported properties:<br />\r\n- `id`<br />\r\n- `number`<br />\r\n- `author_name`<br />\r\n- `status`<br />\r\n- `type`<br />\r\n- `sub_type`<br />\r\n- `created_at`<br />\r\nSupported operators:<br />`==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal),\r\n`<=` (less than or equal)<br />\r\nString values must be double-quoted. Combine multiple filters with `,` (AND) or `|` (OR), with a\r\nspace on each side of the operator. A free-text search box should filter on both `number` and\r\n`author_name`, e.g. `number@=*\"PO-001\" | author_name@=*\"PO-001\"`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "description": "Comma-separated list of order types to restrict the search to. Omit to search across all order types.<br />\r\nSupported values: `Sale`, `Purchase`, `ProductionAssembly`, `ProductionDisassembly`.",
+            "schema": {
+              "type": "string",
+              "example": "Sale,Purchase"
+            },
+            "example": "Sale,Purchase"
+          },
+          {
+            "name": "exclude_order_ids",
+            "in": "query",
+            "description": "Comma-separated list of order ids to exclude from the results — typically the order you're linking\r\nfrom, plus any orders already linked to it.",
+            "schema": {
+              "type": "string",
+              "example": "4016,4017"
+            },
+            "example": "4016,4017"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Specifies the page number for pagination.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sorting to apply to the results: prefix with - for descending, no prefix for ascending.\r\nDefaults to `-created_at` (newest first) when omitted.<br />\r\nSupported properties: `id`, `number`, `author_name`, `created_at`.",
+            "schema": {
+              "type": "string",
+              "example": "-created_at"
+            },
+            "example": "-created_at"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of orders matching the search.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkableOrderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The filters query parameter could not be parsed.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/purchase_orders/open_purchases": {
       "get": {
         "tags": [
@@ -6706,15 +6912,6 @@
         "summary": "List Open Purchase Orders",
         "description": "Returns your open purchase orders grouped by supplier, giving you a per-supplier view of what's still\r\noutstanding. An open purchase order is one that's been approved but not yet fully received or closed.\r\nFilter by one or more supplier IDs to narrow the results to specific suppliers.",
         "parameters": [
-          {
-            "name": "tenant_id",
-            "in": "query",
-            "description": "Filter results by a specific tenant.",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
           {
             "name": "supplier_ids",
             "in": "query",
@@ -8222,7 +8419,13 @@
                             "$ref": "#/components/schemas/StockOnHandInventoryItem"
                           },
                           {
+                            "$ref": "#/components/schemas/GroupedInventoryItem"
+                          },
+                          {
                             "$ref": "#/components/schemas/InventoryItem"
+                          },
+                          {
+                            "$ref": "#/components/schemas/GroupedAllocationItem"
                           },
                           {
                             "$ref": "#/components/schemas/InventoryTurnoverLineItem"
@@ -8619,10 +8822,10 @@
               "type": "array",
               "items": {
                 "enum": [
-                  "quote",
-                  "open",
-                  "closed",
-                  "canceled"
+                  "Quote",
+                  "Open",
+                  "Closed",
+                  "Canceled"
                 ],
                 "type": "string",
                 "description": "Ideally, we should use the states under Global but those contain more states than we need.\r\nThis represents the states we need to expose via the sales APIs."
@@ -8655,12 +8858,12 @@
               "type": "array",
               "items": {
                 "enum": [
-                  "failed",
-                  "draft",
-                  "picked",
-                  "packed",
-                  "completed",
-                  "canceled"
+                  "Failed",
+                  "Draft",
+                  "Picked",
+                  "Packed",
+                  "Completed",
+                  "Canceled"
                 ],
                 "type": "string"
               }
@@ -8674,11 +8877,11 @@
               "type": "array",
               "items": {
                 "enum": [
-                  "awaiting_stock",
-                  "ready_to_ship",
-                  "fulfilled",
-                  "not_applicable",
-                  "on_hold"
+                  "AwaitingStock",
+                  "ReadyToShip",
+                  "Fulfilled",
+                  "NotApplicable",
+                  "OnHold"
                 ],
                 "type": "string"
               }
@@ -8692,9 +8895,9 @@
               "type": "array",
               "items": {
                 "enum": [
-                  "draft",
-                  "partial",
-                  "completed"
+                  "Draft",
+                  "Partial",
+                  "Completed"
                 ],
                 "type": "string"
               }
@@ -8708,9 +8911,9 @@
               "type": "array",
               "items": {
                 "enum": [
-                  "unpaid",
-                  "partially_paid",
-                  "fully_paid"
+                  "Unpaid",
+                  "PartiallyPaid",
+                  "FullyPaid"
                 ],
                 "type": "string"
               }
@@ -8918,6 +9121,96 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SaleOrder"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sale_orders/linkable_orders": {
+      "get": {
+        "tags": [
+          "Sale Orders"
+        ],
+        "summary": "Search Linkable Orders",
+        "description": "Searches across your sale, purchase, and production orders using a QueryKit `filters` expression\r\n(e.g. matching on `number` or `contact.name`). Use this to find candidate orders to link to a\r\nsale order, for example the purchase order that drop-ships it. Restrict to specific order types and\r\nexclude ids (typically the sale order you're linking from, plus any orders already linked to it) to\r\nnarrow the results to orders that are actually eligible to be linked.",
+        "parameters": [
+          {
+            "name": "filters",
+            "in": "query",
+            "description": "Filters to apply to the search: property operator value.<br />\r\nSupported properties:<br />\r\n- `id`<br />\r\n- `number`<br />\r\n- `author_name`<br />\r\n- `status`<br />\r\n- `type`<br />\r\n- `sub_type`<br />\r\n- `created_at`<br />\r\nSupported operators:<br />`==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal),\r\n`<=` (less than or equal)<br />\r\nString values must be double-quoted. Combine multiple filters with `,` (AND) or `|` (OR), with a\r\nspace on each side of the operator. A free-text search box should filter on both `number` and\r\n`author_name`, e.g. `number@=*\"PO-001\" | author_name@=*\"PO-001\"`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "description": "Comma-separated list of order types to restrict the search to. Omit to search across all order types.<br />\r\nSupported values: `Sale`, `Purchase`, `ProductionAssembly`, `ProductionDisassembly`.",
+            "schema": {
+              "type": "string",
+              "example": "Sale,Purchase"
+            },
+            "example": "Sale,Purchase"
+          },
+          {
+            "name": "exclude_order_ids",
+            "in": "query",
+            "description": "Comma-separated list of order ids to exclude from the results — typically the order you're linking\r\nfrom, plus any orders already linked to it.",
+            "schema": {
+              "type": "string",
+              "example": "4016,4017"
+            },
+            "example": "4016,4017"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Specifies the page number for pagination.",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Sorting to apply to the results: prefix with - for descending, no prefix for ascending.\r\nDefaults to `-created_at` (newest first) when omitted.<br />\r\nSupported properties: `id`, `number`, `author_name`, `created_at`.",
+            "schema": {
+              "type": "string",
+              "example": "-created_at"
+            },
+            "example": "-created_at"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of orders matching the search.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkableOrderListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The filters query parameter could not be parsed.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Microsoft.AspNetCore.Mvc.ProblemDetails"
                 }
               }
             }
@@ -12405,9 +12698,9 @@
           },
           "type": {
             "enum": [
-              "warehouse",
-              "billing",
-              "dropship"
+              "Warehouse",
+              "Billing",
+              "Dropship"
             ],
             "type": "string",
             "description": "The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`.",
@@ -12552,6 +12845,23 @@
         "additionalProperties": false,
         "description": "The address associated with the action."
       },
+      "AdjustmentAgent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier of the user.",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the user, or null when the user no longer exists.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A user who has recorded a stocktake count on an adjustment."
+      },
       "AdjustmentBase": {
         "type": "object",
         "properties": {
@@ -12604,7 +12914,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).",
+            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).\r\nThis is derived, not chosen: an adjustment starts Simple and is promoted to Advanced\r\nonce a second agent records a count on it. The promotion is permanent.",
             "nullable": true
           },
           "location": {
@@ -12705,6 +13015,14 @@
             "description": "ID of the user who created the adjustment.",
             "format": "int64"
           },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentAgent"
+            },
+            "description": "The users who have recorded a stocktake count on this adjustment, across all of its line\r\nitems, with the requesting user first. Empty when nobody has counted it yet.",
+            "nullable": true
+          },
           "id": {
             "type": "integer",
             "description": "Unique identifier of the adjustment.",
@@ -12754,7 +13072,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).",
+            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).\r\nThis is derived, not chosen: an adjustment starts Simple and is promoted to Advanced\r\nonce a second agent records a count on it. The promotion is permanent.",
             "nullable": true
           },
           "location": {
@@ -12803,11 +13121,6 @@
           "reconciliation_status": {
             "type": "string",
             "description": "Review state for this stocktake line.",
-            "nullable": true
-          },
-          "count_agreement": {
-            "type": "string",
-            "description": "Whether the warehouse agents who scanned this line agreed with each other on the counted\r\nquantity. Orthogonal to Qoblex.Api.Adjustments.Dtos.AdjustmentItemDto.ReconciliationStatus.",
             "nullable": true
           },
           "previous_quantity": {
@@ -12919,8 +13232,8 @@
           },
           "action": {
             "enum": [
-              "add",
-              "set"
+              "Add",
+              "Set"
             ],
             "type": "string",
             "description": "Whether this scan added to the running count or set the observed count."
@@ -12958,6 +13271,14 @@
             "type": "integer",
             "description": "ID of the user who created the adjustment.",
             "format": "int64"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentAgent"
+            },
+            "description": "The users who have recorded a stocktake count on this adjustment, across all of its line\r\nitems, with the requesting user first. Empty when nobody has counted it yet.",
+            "nullable": true
           },
           "id": {
             "type": "integer",
@@ -13008,7 +13329,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).",
+            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).\r\nThis is derived, not chosen: an adjustment starts Simple and is promoted to Advanced\r\nonce a second agent records a count on it. The promotion is permanent.",
             "nullable": true
           },
           "location": {
@@ -13143,19 +13464,19 @@
           },
           "order_type": {
             "enum": [
-              "sale",
-              "purchase",
-              "production_assembly",
-              "production_disassembly"
+              "Sale",
+              "Purchase",
+              "ProductionAssembly",
+              "ProductionDisassembly"
             ],
             "type": "string",
             "description": "The type of order the stock is allocated to."
           },
           "allocated_variant_type": {
             "enum": [
-              "simple",
-              "bundle",
-              "component"
+              "Simple",
+              "Bundle",
+              "Component"
             ],
             "type": "string",
             "description": "The type of product variant allocated."
@@ -13209,9 +13530,9 @@
         "properties": {
           "owner_type": {
             "enum": [
-              "order",
-              "product",
-              "contact"
+              "Order",
+              "Product",
+              "Contact"
             ],
             "type": "string",
             "description": "Type of entity the custom fields will be assigned to."
@@ -13373,13 +13694,13 @@
         "properties": {
           "operation_type": {
             "enum": [
-              "goods_receipt_note",
-              "assembly_order",
-              "transfer",
-              "sale_order",
-              "sale_return",
-              "supplier_return",
-              "adjustment"
+              "GoodsReceiptNote",
+              "AssemblyOrder",
+              "Transfer",
+              "SaleOrder",
+              "SaleReturn",
+              "SupplierReturn",
+              "Adjustment"
             ],
             "type": "string"
           },
@@ -13809,9 +14130,9 @@
         "properties": {
           "owner_type": {
             "enum": [
-              "order",
-              "product",
-              "contact"
+              "Order",
+              "Product",
+              "Contact"
             ],
             "type": "string",
             "description": "Type of entity the custom field belongs to.",
@@ -13887,9 +14208,9 @@
           },
           "owner_type": {
             "enum": [
-              "order",
-              "product",
-              "contact"
+              "Order",
+              "Product",
+              "Contact"
             ],
             "type": "string",
             "description": "Entity type this field belongs to."
@@ -14121,9 +14442,15 @@
             "example": "Urgent, Electronics"
           },
           "type": {
+            "enum": [
+              "RegularPO",
+              "FreightPO",
+              "DropShipPo"
+            ],
             "type": "string",
-            "description": "Type of the purchase order.\r\n- `Regular Order`\r\n- `Freight Order`",
-            "nullable": true
+            "description": "Type of the purchase order. Defaults to `RegularPO` when omitted.<br />\r\n- `RegularPO` — stock bought from a supplier and received into a location.<br />\r\n- `FreightPO` — freight and other landed costs, billed but never received.<br />\r\n- `DropShipPo` — raised so the supplier ships straight to your customer.<br />\r\nThe spellings `Regular Order`, `Freight Order` and `Drop Ship Order` are also accepted.\r\nAny other value is rejected.",
+            "nullable": true,
+            "example": "RegularPO"
           }
         },
         "additionalProperties": false,
@@ -14603,6 +14930,15 @@
             "description": "Display name of the customer.",
             "nullable": true
           },
+          "customer_business_type": {
+            "enum": [
+              "Wholesale",
+              "Retailer"
+            ],
+            "type": "string",
+            "description": "Business type of the customer. Null when the customer could not be resolved.",
+            "nullable": true
+          },
           "gross_amount": {
             "type": "number",
             "description": "Order value before discounts and tax.",
@@ -14827,7 +15163,7 @@
           },
           "source": {
             "enum": [
-              "calculated"
+              "Calculated"
             ],
             "type": "string",
             "description": "How this suggested purchase order was produced."
@@ -14955,10 +15291,10 @@
           },
           "state": {
             "enum": [
-              "draft",
-              "active",
-              "deleted",
-              "archived"
+              "Draft",
+              "Active",
+              "Deleted",
+              "Archived"
             ],
             "type": "string",
             "description": "Current lifecycle state of the variant (for example active or archived)."
@@ -15026,18 +15362,18 @@
           },
           "variant_type": {
             "enum": [
-              "simple",
-              "bundle",
-              "component"
+              "Simple",
+              "Bundle",
+              "Component"
             ],
             "type": "string",
             "description": "Whether the variant is a simple item, a bundle, or a bundle component."
           },
           "forecast_method": {
             "enum": [
-              "historical_average_weekly_sales",
-              "seasonal",
-              "trend"
+              "HistoricalAverageWeeklySales",
+              "Seasonal",
+              "Trend"
             ],
             "type": "string",
             "description": "The forecasting method used to project demand for this variant."
@@ -15184,15 +15520,15 @@
           },
           "type": {
             "enum": [
-              "none",
-              "transfer",
-              "adjustment",
-              "shipment",
-              "goods_receipt_note",
-              "assembly_order",
-              "reverse_shipment",
-              "sale_return",
-              "supplier_return"
+              "None",
+              "Transfer",
+              "Adjustment",
+              "Shipment",
+              "GoodsReceiptNote",
+              "AssemblyOrder",
+              "ReverseShipment",
+              "SaleReturn",
+              "SupplierReturn"
             ],
             "type": "string",
             "description": "Type of inventory transaction.",
@@ -15252,6 +15588,118 @@
               "format": "int32"
             },
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "GroupedAllocationItem": {
+        "type": "object",
+        "properties": {
+          "grouping_key": {
+            "nullable": true
+          },
+          "grouping_by_dim": {
+            "$ref": "#/components/schemas/IGroupingDim"
+          },
+          "brand_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "supplier_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "customer_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "integration_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "product_type_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "sale_channel_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "user_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "location_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "sale_order_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "production_order_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "variant_dim_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
+          },
+          "allocated_quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "requested_quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "on_back_order_quantity": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -15614,6 +16062,52 @@
             "type": "number",
             "description": "Quantity of stock aged over a year for this group.",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GroupedInventoryItem": {
+        "type": "object",
+        "properties": {
+          "grouping_key": {
+            "description": "The value this group is grouped by.",
+            "nullable": true
+          },
+          "grouping_by_dim": {
+            "$ref": "#/components/schemas/IGroupingDim"
+          },
+          "total_quantity": {
+            "type": "number",
+            "description": "Total quantity of stock on hand for this group.",
+            "format": "double"
+          },
+          "allocated_total_quantity": {
+            "type": "number",
+            "description": "Total quantity reserved for open orders in this group.",
+            "format": "double"
+          },
+          "available_total_quantity": {
+            "type": "number",
+            "description": "Total quantity available to sell in this group after allocations.",
+            "format": "double"
+          },
+          "incoming_total_quantity": {
+            "type": "number",
+            "description": "Total quantity expected in from incoming purchase orders for this group.",
+            "format": "double"
+          },
+          "buffer_total_quantity": {
+            "type": "number",
+            "description": "Total buffer stock held back as a safety level for this group.",
+            "format": "double"
+          },
+          "inventory_levels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InventoryLevel"
+            },
+            "description": "Per-location breakdown of stock levels for this group.",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17070,10 +17564,10 @@
           },
           "state": {
             "enum": [
-              "draft",
-              "active",
-              "deleted",
-              "archived"
+              "Draft",
+              "Active",
+              "Deleted",
+              "Archived"
             ],
             "type": "string",
             "description": "Whether the product variant is active or archived."
@@ -17231,10 +17725,10 @@
           },
           "state": {
             "enum": [
-              "draft",
-              "active",
-              "deleted",
-              "archived"
+              "Draft",
+              "Active",
+              "Deleted",
+              "Archived"
             ],
             "type": "string",
             "description": "Whether the product variant is active or archived."
@@ -17463,10 +17957,10 @@
           },
           "state": {
             "enum": [
-              "draft",
-              "active",
-              "deleted",
-              "archived"
+              "Draft",
+              "Active",
+              "Deleted",
+              "Archived"
             ],
             "type": "string",
             "description": "Whether the product variant is active or archived."
@@ -17613,10 +18107,10 @@
           },
           "state": {
             "enum": [
-              "draft",
-              "active",
-              "deleted",
-              "archived"
+              "Draft",
+              "Active",
+              "Deleted",
+              "Archived"
             ],
             "type": "string",
             "description": "Whether the product variant is active or archived."
@@ -17758,8 +18252,8 @@
           },
           "line_type": {
             "enum": [
-              "order_item",
-              "landed_cost"
+              "OrderItem",
+              "LandedCost"
             ],
             "type": "string",
             "description": "The kind of line this row represents (for example a product, custom, or shipping line)."
@@ -17866,6 +18360,93 @@
         },
         "additionalProperties": false,
         "description": "A JobDto represents a unit of work that is processed in the background by the system.\r\nJobs can be created, managed, and executed asynchronously, allowing long-running tasks to be handled without blocking the main thread of execution."
+      },
+      "LinkableOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier of the order.",
+            "format": "int32",
+            "readOnly": true,
+            "example": 4016
+          },
+          "number": {
+            "type": "string",
+            "description": "Reference number of the order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "PO-001"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of the order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "Purchase"
+          },
+          "sub_type": {
+            "type": "string",
+            "description": "Sub-type of the order, when it has one.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "RegularPO"
+          },
+          "status": {
+            "type": "string",
+            "description": "Current status of the order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "Open"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Date and time when the order was created.",
+            "format": "date-time",
+            "readOnly": true,
+            "example": "2026-04-01T10:00:00Z"
+          },
+          "author_id": {
+            "type": "integer",
+            "description": "Unique identifier of the order's author.",
+            "format": "int32",
+            "readOnly": true,
+            "example": 5001
+          },
+          "author_name": {
+            "type": "string",
+            "description": "Name of the order's author.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "Acme Supplies"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A minimal, cross-order-type summary of an order, returned when searching for orders to link\r\ntogether (for example linking a purchase order to a back-order, or to the sale order it drop-ships for)."
+      },
+      "LinkableOrderListResponse": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LinkableOrder"
+            },
+            "description": "The list of items.",
+            "nullable": true
+          },
+          "count": {
+            "type": "integer",
+            "description": "The total number of items in the list.",
+            "format": "int32"
+          },
+          "filtered_count": {
+            "type": "integer",
+            "description": "The total number of items in the list after applying filters, if any.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
       },
       "ListCustomFieldsResponse": {
         "type": "object",
@@ -18435,9 +19016,15 @@
             "example": "Urgent, Electronics"
           },
           "type": {
+            "enum": [
+              "RegularPO",
+              "FreightPO",
+              "DropShipPo"
+            ],
             "type": "string",
-            "description": "Type of the purchase order.\r\n- `Regular Order`\r\n- `Freight Order`",
-            "nullable": true
+            "description": "Type of the purchase order. Defaults to `RegularPO` when omitted.<br />\r\n- `RegularPO` — stock bought from a supplier and received into a location.<br />\r\n- `FreightPO` — freight and other landed costs, billed but never received.<br />\r\n- `DropShipPo` — raised so the supplier ships straight to your customer.<br />\r\nThe spellings `Regular Order`, `Freight Order` and `Drop Ship Order` are also accepted.\r\nAny other value is rejected.",
+            "nullable": true,
+            "example": "RegularPO"
           }
         },
         "additionalProperties": false
@@ -18545,8 +19132,8 @@
           "type": {
             "enum": [
               "days_net",
-              "days_after_e_o_m",
-              "days_e_o_m_xth_day"
+              "days_after_eom",
+              "days_eom_xth_day"
             ],
             "type": "string",
             "description": "How the due date is calculated: from the invoice date, or relative to the end of the month.",
@@ -19062,7 +19649,7 @@
           },
           "kind": {
             "enum": [
-              "incoming"
+              "Incoming"
             ],
             "type": "string",
             "description": "Type of the movement.",
@@ -19116,11 +19703,6 @@
       "ProductSupplier": {
         "type": "object",
         "properties": {
-          "tenant_id": {
-            "type": "integer",
-            "description": "Tenant identifier of the supplierr",
-            "format": "int32"
-          },
           "supplier_id": {
             "type": "integer",
             "description": "Unique identifier of the supplier",
@@ -19986,6 +20568,13 @@
             "nullable": true,
             "readOnly": true
           },
+          "total": {
+            "type": "number",
+            "description": "The bill's total, in the order's currency. Null if it couldn't be computed (see\r\nGostad.Domain.Global.Projections.BillBasicResponse.Total).",
+            "format": "double",
+            "nullable": true,
+            "readOnly": true
+          },
           "payments": {
             "type": "array",
             "items": {
@@ -20295,8 +20884,8 @@
           },
           "type": {
             "enum": [
-              "landed_cost",
-              "expenses"
+              "LandedCost",
+              "Expenses"
             ],
             "type": "string"
           }
@@ -20370,10 +20959,10 @@
           },
           "status": {
             "enum": [
-              "draft",
-              "open",
-              "closed",
-              "deleted"
+              "Draft",
+              "Open",
+              "Closed",
+              "Deleted"
             ],
             "type": "string",
             "description": "The current status of the purchase order."
@@ -20576,9 +21165,9 @@
           },
           "order_type": {
             "enum": [
-              "regular",
-              "freight",
-              "drop_ship"
+              "Regular",
+              "Freight",
+              "DropShip"
             ],
             "type": "string",
             "description": "The type of order this line belongs to.",
@@ -20591,9 +21180,9 @@
           },
           "line_type": {
             "enum": [
-              "order_item",
-              "landed_cost",
-              "expense"
+              "OrderItem",
+              "LandedCost",
+              "Expense"
             ],
             "type": "string",
             "description": "The kind of line this row represents (for example an order, receipt, bill or return line).",
@@ -21029,13 +21618,6 @@
             "readOnly": true,
             "example": 4016
           },
-          "type": {
-            "type": "string",
-            "description": "Type of the purchase order.",
-            "nullable": true,
-            "readOnly": true,
-            "example": "Regular Order"
-          },
           "number": {
             "type": "string",
             "description": "Reference number of the purchase order.",
@@ -21110,12 +21692,17 @@
             "readOnly": true,
             "example": "Parially Paid"
           },
-          "sub_type": {
+          "type": {
+            "enum": [
+              "RegularPO",
+              "FreightPO",
+              "DropShipPo"
+            ],
             "type": "string",
-            "description": "Sub-type of the purchase order.",
+            "description": "Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`.",
             "nullable": true,
             "readOnly": true,
-            "example": "Regular Order"
+            "example": "RegularPO"
           },
           "shipping_location_id": {
             "type": "integer",
@@ -21269,6 +21856,14 @@
             },
             "description": "List of supplier refunds recorded against the order. Only present when requested via\r\n`expand=refunds`.",
             "nullable": true
+          },
+          "related_orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelatedOrder"
+            },
+            "description": "Other orders linked to this purchase order — for example a back-order it's linked to, or the\r\nsale order it drop-ships for. Only present when requested via `expand=related_orders`.",
+            "nullable": true
           }
         },
         "additionalProperties": false,
@@ -21314,6 +21909,11 @@
             "type": "string",
             "description": "Type of the custom line (e.g., Landed Costs or Expenses).",
             "nullable": true
+          },
+          "billed_quantity": {
+            "type": "number",
+            "description": "Quantity of this custom line billed across all bills raised against the order. Populated by\r\nQoblex.Api.Purchases.Commands.GetPurchaseOrderCommandHandler the same way as\r\nQoblex.Api.Purchases.Dto.PurchaseOrderLineItemDto.BilledQuantity, since it needs the order's invoice landed\r\ncost items, which this DTO's own conversions don't load. Custom lines aren't returnable, so there's\r\nno equivalent returned quantity here.",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -21390,6 +21990,16 @@
           "distributed_cost": {
             "type": "number",
             "description": "Portions of landed costs (custom lines) distributed onto this line item.",
+            "format": "double"
+          },
+          "billed_quantity": {
+            "type": "number",
+            "description": "Quantity of this line item billed across all bills raised against the order. Populated by\r\nQoblex.Api.Purchases.Commands.GetPurchaseOrderCommandHandler alongside Qoblex.Api.Purchases.Dto.PurchaseOrderLineItemDto.ReturnedQuantity,\r\nsince computing it needs the order's invoice line items, which this DTO's own constructors don't load.",
+            "format": "double"
+          },
+          "returned_quantity": {
+            "type": "number",
+            "description": "Quantity of this line item returned across all supplier returns raised against the order. See\r\nQoblex.Api.Purchases.Dto.PurchaseOrderLineItemDto.BilledQuantity for how this is populated.",
             "format": "double"
           }
         },
@@ -21729,10 +22339,10 @@
           },
           "status": {
             "enum": [
-              "draft",
-              "open",
-              "closed",
-              "deleted"
+              "Draft",
+              "Open",
+              "Closed",
+              "Deleted"
             ],
             "type": "string",
             "description": "The current status of the purchase order."
@@ -23250,9 +23860,9 @@
           },
           "type": {
             "enum": [
-              "landed_cost",
-              "back_order",
-              "drop_ship"
+              "LandedCost",
+              "BackOrder",
+              "DropShip"
             ],
             "type": "string",
             "description": "How the linked order relates to this purchase order (e.g. drop-ship, backorder)."
@@ -23768,9 +24378,9 @@
           },
           "refund_status": {
             "enum": [
-              "draft",
-              "partial",
-              "completed"
+              "Draft",
+              "Partial",
+              "Completed"
             ],
             "type": "string"
           },
@@ -24037,11 +24647,13 @@
         "properties": {
           "strategy": {
             "enum": [
-              "set_quantity",
-              "accept_scanner",
-              "merge",
-              "accept_system",
-              "accept_suggestion"
+              "SetQuantity",
+              "AcceptScanner",
+              "Merge",
+              "AcceptSystem",
+              "AcceptSuggestion",
+              "AcceptMin",
+              "AcceptMax"
             ],
             "type": "string",
             "description": "How the final quantity is determined for each line in `items`. Defaults to\r\n`SetQuantity`, which writes the `final_quantity` supplied for each line. The other\r\nstrategies ignore `final_quantity` and compute it from the scanners' counts instead."
@@ -24121,6 +24733,14 @@
             "description": "ID of the user who created the adjustment.",
             "format": "int64"
           },
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentAgent"
+            },
+            "description": "The users who have recorded a stocktake count on this adjustment, across all of its line\r\nitems, with the requesting user first. Empty when nobody has counted it yet.",
+            "nullable": true
+          },
           "id": {
             "type": "integer",
             "description": "Unique identifier of the adjustment.",
@@ -24170,7 +24790,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).",
+            "description": "Whether the adjustment is Simple (final quantities set directly, no reconciliation) or\r\nAdvanced (goes through the scan-session/reconciliation workflow before authorization).\r\nThis is derived, not chosen: an adjustment starts Simple and is promoted to Advanced\r\nonce a second agent records a count on it. The promotion is permanent.",
             "nullable": true
           },
           "location": {
@@ -24298,6 +24918,69 @@
           }
         },
         "additionalProperties": false
+      },
+      "RelatedOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique identifier of the linked order.",
+            "format": "int32",
+            "readOnly": true,
+            "example": 7042
+          },
+          "number": {
+            "type": "string",
+            "description": "Reference number of the linked order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "SO-1042"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of the linked order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "Sale"
+          },
+          "status": {
+            "type": "string",
+            "description": "Current status of the linked order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "Open"
+          },
+          "contact_name": {
+            "type": "string",
+            "description": "Name of the contact on the linked order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "Jane Doe"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "Date and time when the two orders were linked.",
+            "format": "date-time",
+            "readOnly": true,
+            "example": "2026-04-01T10:00:00Z"
+          },
+          "link_type": {
+            "type": "string",
+            "description": "How the linked order relates to this purchase order.",
+            "nullable": true,
+            "readOnly": true,
+            "example": "BackOrder"
+          },
+          "direction": {
+            "type": "string",
+            "description": "Whether this purchase order is the source or the target of the link. Linked as the source, this\r\npurchase order points at the linked order (for example the sale order it drop-ships for); linked\r\nas the target, the linked order points at this purchase order (for example a back-order raised\r\nagainst it).",
+            "nullable": true,
+            "readOnly": true,
+            "example": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "description": "An order linked to a purchase order — for example a back-order it's linked to, or the sale order it\r\ndrop-ships for. Only present when requested via `expand=related_orders`."
       },
       "ReorderLocationLevel": {
         "type": "object",
@@ -24525,11 +25208,11 @@
           },
           "status": {
             "enum": [
-              "quote",
-              "open",
-              "closed",
-              "deleted",
-              "canceled"
+              "Quote",
+              "Open",
+              "Closed",
+              "Deleted",
+              "Canceled"
             ],
             "type": "string",
             "description": "Current status of the sales order."
@@ -24537,6 +25220,15 @@
           "customer.name": {
             "type": "string",
             "description": "Display name of the customer.",
+            "nullable": true
+          },
+          "customer_business_type": {
+            "enum": [
+              "Wholesale",
+              "Retailer"
+            ],
+            "type": "string",
+            "description": "Business type of the customer. Null when the customer could not be resolved.",
             "nullable": true
           },
           "sale_agent.name": {
@@ -24664,8 +25356,14 @@
             "nullable": true
           },
           "return_type": {
+            "enum": [
+              "None",
+              "Restock",
+              "NonRestock",
+              "Canceled"
+            ],
             "type": "string",
-            "description": "The type of return recorded for this line.",
+            "description": "The type of return recorded for this line, or null when the line was not returned.",
             "nullable": true
           },
           "quantity_returned": {
@@ -24737,8 +25435,8 @@
           },
           "line_type": {
             "enum": [
-              "order_item",
-              "landed_cost"
+              "OrderItem",
+              "LandedCost"
             ],
             "type": "string",
             "description": "The kind of line this row represents (for example a product, custom, or shipping line)."
@@ -25136,13 +25834,13 @@
           },
           "stock_status": {
             "enum": [
-              "awaiting_stock",
-              "ready_to_ship",
-              "fulfilled",
-              "partially_received",
-              "received",
-              "not_applicable",
-              "on_hold"
+              "AwaitingStock",
+              "ReadyToShip",
+              "Fulfilled",
+              "PartiallyReceived",
+              "Received",
+              "NotApplicable",
+              "OnHold"
             ],
             "type": "string",
             "description": "Current availability of a product in inventory.",
@@ -25150,9 +25848,9 @@
           },
           "invoicing_status": {
             "enum": [
-              "draft",
-              "partial",
-              "completed"
+              "Draft",
+              "Partial",
+              "Completed"
             ],
             "type": "string",
             "description": "Tracks the invoicing stage of the order.",
@@ -25160,9 +25858,9 @@
           },
           "refund_status": {
             "enum": [
-              "draft",
-              "partial",
-              "completed"
+              "Draft",
+              "Partial",
+              "Completed"
             ],
             "type": "string",
             "description": "Current state of a refund in its lifecycle."
@@ -25265,8 +25963,8 @@
           },
           "discount_type": {
             "enum": [
-              "percentage",
-              "fixed"
+              "Percentage",
+              "Fixed"
             ],
             "type": "string",
             "description": "Type of discount."
@@ -25311,6 +26009,12 @@
             "format": "double",
             "example": 3
           },
+          "quantity_unit": {
+            "type": "string",
+            "description": "Unit of measure for the line item's quantity.",
+            "nullable": true,
+            "example": "kg"
+          },
           "cost_of_goods_sold": {
             "type": "number",
             "description": "The internal cost of the product for margin calculation.",
@@ -25336,8 +26040,8 @@
           },
           "discount_type": {
             "enum": [
-              "percentage",
-              "fixed"
+              "Percentage",
+              "Fixed"
             ],
             "type": "string",
             "description": "Type of discount applied."
@@ -25723,11 +26427,11 @@
           },
           "status": {
             "enum": [
-              "quote",
-              "open",
-              "closed",
-              "deleted",
-              "canceled"
+              "Quote",
+              "Open",
+              "Closed",
+              "Deleted",
+              "Canceled"
             ],
             "type": "string",
             "description": "Current status of the sales order."
@@ -25819,9 +26523,9 @@
           },
           "allocated_variant_type": {
             "enum": [
-              "simple",
-              "bundle",
-              "component"
+              "Simple",
+              "Bundle",
+              "Component"
             ],
             "type": "string",
             "description": "The type of product variant on this line."
@@ -26707,11 +27411,56 @@
             "format": "double",
             "nullable": true
           },
+          "amounts": {
+            "$ref": "#/components/schemas/SalesInvoiceAmounts"
+          },
+          "units_invoiced": {
+            "type": "number",
+            "description": "Total number of units invoiced across all line items.",
+            "format": "double"
+          },
           "sync_summary": {
             "$ref": "#/components/schemas/SalesSyncSummary"
           }
         },
         "additionalProperties": false
+      },
+      "SalesInvoiceAmounts": {
+        "type": "object",
+        "properties": {
+          "subtotal": {
+            "type": "number",
+            "description": "Invoice subtotal before tax and discounts.",
+            "format": "double"
+          },
+          "total_discount": {
+            "type": "number",
+            "description": "Total discount applied across the invoice's line items and custom items.",
+            "format": "double"
+          },
+          "tax_total": {
+            "type": "number",
+            "description": "Invoice tax total.",
+            "format": "double"
+          },
+          "total": {
+            "type": "number",
+            "description": "Invoice total.",
+            "format": "double"
+          },
+          "paid": {
+            "type": "number",
+            "description": "Amount already paid against the invoice.",
+            "format": "double"
+          },
+          "due": {
+            "type": "number",
+            "description": "Remaining amount due on the invoice.",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "The monetary breakdown of an invoice, in the order currency and rounded to the account's\r\ncurrency decimals. Mirrors the purchase-side bill summary so both documents report the same\r\nfigures the same way."
       },
       "SalesInvoiceCustomItemRequest": {
         "type": "object",
@@ -26773,6 +27522,17 @@
             "type": "number",
             "description": "The discount amount applied to this custom item.",
             "format": "double"
+          },
+          "discount_type": {
+            "type": "string",
+            "description": "Whether Qoblex.Api.Sales.Dto.InvoiceCustomItemsDto.Discount is a percentage or a fixed amount.",
+            "nullable": true,
+            "example": "Percentage"
+          },
+          "total": {
+            "type": "number",
+            "description": "The line total, net of its discount, in the order currency.",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -26808,6 +27568,17 @@
           "discount": {
             "type": "number",
             "description": "The discount amount applied to this invoice item.",
+            "format": "double"
+          },
+          "discount_type": {
+            "type": "string",
+            "description": "Whether Qoblex.Api.Sales.Dto.InvoiceItemDto.Discount is a percentage or a fixed amount.",
+            "nullable": true,
+            "example": "Percentage"
+          },
+          "total": {
+            "type": "number",
+            "description": "The line total, net of its discount, in the order currency.",
             "format": "double"
           }
         },
@@ -26900,8 +27671,8 @@
           },
           "type": {
             "enum": [
-              "landed_cost",
-              "expenses"
+              "LandedCost",
+              "Expenses"
             ],
             "type": "string",
             "description": "The category of the landed cost. Defines how the cost is classified or allocated."
@@ -28780,10 +29551,10 @@
           },
           "state": {
             "enum": [
-              "draft",
-              "active",
-              "deleted",
-              "archived"
+              "Draft",
+              "Active",
+              "Deleted",
+              "Archived"
             ],
             "type": "string",
             "description": "Whether the product variant is active or archived."
@@ -28952,10 +29723,10 @@
           },
           "state": {
             "enum": [
-              "draft",
-              "active",
-              "deleted",
-              "archived"
+              "Draft",
+              "Active",
+              "Deleted",
+              "Archived"
             ],
             "type": "string",
             "description": "Whether the product variant is active or archived."
@@ -29903,8 +30674,8 @@
           },
           "status": {
             "enum": [
-              "draft",
-              "received"
+              "Draft",
+              "Received"
             ],
             "type": "string",
             "description": "Current status of the transfer: `Draft` while it can still be edited, or\r\n`Received` once it has been authorized and the stock has moved to the destination."
@@ -30724,8 +31495,8 @@
           },
           "operation": {
             "enum": [
-              "adjust",
-              "set"
+              "Adjust",
+              "Set"
             ],
             "type": "string",
             "description": "Whether `quantity` is a delta to apply (`Adjust`) or the final quantity to write\r\ndirectly (`Set`). Defaults to `Set` when omitted, matching the common stocktake\r\n\"counted quantity\" use case; pass `Adjust` explicitly for a +/- delta line."
@@ -31108,7 +31879,7 @@
     }
   ],
   "x-qoblex-toolkit": {
-    "source": "https://api.qoblex.com/swagger/v1/swagger.json",
+    "source": "https://api.qoblex.com/openapi/v1/openapi.json",
     "note": "A subset of the published Qoblex API document: the endpoints an integration calls. Endpoints that only back the Qoblex web app's own screens are excluded so that agent context is spent on the integration surface. The complete document is at the source URL.",
     "excluded_operations": 53
   }

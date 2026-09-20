@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 3 endpoints.
 
@@ -39,7 +39,6 @@ Payments can only be added to bills that have been authorized.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -50,7 +49,7 @@ Payments can only be added to bills that have been authorized.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -74,6 +73,7 @@ Payments can only be added to bills that have been authorized.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/payments' \
@@ -112,7 +112,6 @@ Updates a payment already recorded against a bill, for example to correct its am
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -123,7 +122,7 @@ Updates a payment already recorded against a bill, for example to correct its am
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -147,6 +146,7 @@ Updates a payment already recorded against a bill, for example to correct its am
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/payments/{payment_id}' \
@@ -174,7 +174,6 @@ that amount to the bill's amount due.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -185,7 +184,7 @@ that amount to the bill's amount due.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -209,6 +208,7 @@ that amount to the bill's amount due.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/payments/{payment_id}' \

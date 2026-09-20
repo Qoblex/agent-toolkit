@@ -103,6 +103,16 @@ grouped by supplier and takes `supplier_ids`. Use it rather than paging
 already arrived. Note this endpoint uses the second filter dialect: see
 [conventions](conventions.md#there-are-two-filter-engines-and-they-are-not-compatible).
 
+### Which of our POs are drop-ship
+
+`GET /v1/purchase_orders?filters=type=="DropShipPo"`. The `type` field was remodelled in
+September 2026 and is now filterable, with three values: `RegularPO`, `FreightPO` and
+`DropShipPo`. Freight orders are the landed-cost ones, billed but never received, so
+excluding them is usually what you want when you are counting goods on order.
+
+Remember this endpoint takes the second filter dialect, so string values are double-quoted:
+see [conventions](conventions.md#there-are-two-filter-engines-and-they-are-not-compatible).
+
 ### Raise the purchase orders for a set of sale orders
 
 `GET /v1/sale_orders/preview_purchase_orders` shows what would be created and creates

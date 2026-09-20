@@ -1,6 +1,6 @@
 # Qoblex API v1: full reference for language models
 
-Generated from https://api.qoblex.com/swagger/v1/swagger.json. 197 endpoints, 30 resource groups.
+Generated from https://api.qoblex.com/openapi/v1/openapi.json. 201 endpoints, 30 resource groups.
 Source: https://github.com/qoblex/agent-toolkit
 
 ---
@@ -14,7 +14,7 @@ sale orders, shipments, purchasing, goods receipts, bills, manufacturing, batche
 - **Base URL** `https://api.qoblex.com`, every path under `/v1`.
 - **Auth** one header, `qoblex-x-api-key`. See [authentication](authentication.md).
 - **Shape** REST, JSON in and JSON out, standard verbs and status codes.
-- **Size** 197 operations over 156 paths in 30 resource groups.
+- **Size** 201 operations over 160 paths in 30 resource groups.
 - **Machine-readable** the OpenAPI 3.0.1 document is at
   [`/swagger/v1/swagger.json`](https://api.qoblex.com/swagger/v1/swagger.json), and a copy
   is committed here at [`spec/openapi.json`](../spec/openapi.json).
@@ -161,7 +161,7 @@ There are three exceptions, and they are not guessable:
 
 | Shape | Where | How |
 | --- | --- | --- |
-| `page`, zero-based | 20 endpoints, including all the main collections | `?page=0`, then `1`, `2` |
+| `page`, zero-based | 22 endpoints, including all the main collections | `?page=0`, then `1`, `2` |
 | `page` + `page_size` | `/v1/activity` | set the size yourself |
 | `limit` + `offset` | `/v1/products/{id}/variants` | advance `offset` by the records returned |
 | `offset` | `/v1/products/overview` | same, with the size fixed by the server |
@@ -235,14 +235,16 @@ property of how it was built, and the document does not currently say which is w
 | `\|` means | *any of these values* for one field: `status==open\|packed` | *OR between whole conditions* |
 | Endpoints | every other filterable list | the eight below |
 
-The eight on the second dialect, and this list is complete (confirmed against the API
-source, 2026-09-13):
+The ten on the second dialect. Eight were confirmed against the API source on 2026-09-13;
+the two search endpoints added since name their engine in their own description:
 
 ```
 GET /v1/purchase_orders          GET /v1/manufacturing_orders
 GET /v1/sale_orders              GET /v1/tax_classes
 GET /v1/suppliers                GET /v1/account/locations
 GET /v1/batches                  GET /v1/settings/document_templates
+GET /v1/purchase_orders/linkable_orders
+GET /v1/sale_orders/linkable_orders
 ```
 
 Every other filterable list endpoint uses the first dialect, the one the operator table
@@ -323,65 +325,45 @@ each rejected field:
 
 Read `errors` and fix the named field. Do not retry an unchanged `400`.
 
-**A blank "Required" column means unknown, not optional.** Only 6 of the 355 schemas in the
+**A blank "Required" column means unknown, not optional.** Only 6 of the 361 schemas in the
 spec declare a `required` list, so the generated reference has almost nothing to put in that
 column. Some fields are documented as required in their own description instead:
 `billing_location_id` on a purchase order says so in prose and is not in any `required`
 array. Treat the validation response as the authority. Send what you believe is a complete
 record, read the `errors` object if it comes back `400`, and add what it names.
 
-**An enum value in the reference is what the document publishes, which is not always what
-the API accepts.** The enum lists in these pages come from the OpenAPI document, and the
-document is generated from the C# type names through a snake_case converter. Where that
-conversion is lossy, the published value is not a value the API will take.
+**An enum value is now the value the API uses, and that is recent.** The enum lists in
+these pages come from the OpenAPI document, which is generated from the API's own types.
+Until September 2026 that generation mangled the names on the way out, so the document
+published values the API had never accepted. It was fixed wholesale: the document now
+publishes the wire spelling, and where legacy spellings are still taken the endpoint says so
+outright, as `POST /v1/purchase_orders` does for its `type`.
 
-It is provable on the live document rather than a suspicion. `PaymentTerm.type` publishes:
+Two conventions coexist in the result, which is untidy rather than wrong. Most enums are
+`PascalCase` (`RegularPO`, `AwaitingStock`, `GoodsReceiptNote`); a handful are snake_case
+(`ProductVariant.type` is `simple`, `bundle`, `bill_of_material`, and the reporting
+`report_type` values are `stock_on_hand`, `inventory_reorder` and so on). Copy the spelling
+from the endpoint you are calling rather than converting it to the one you saw last.
 
-```
-days_net, days_after_e_o_m, days_e_o_m_xth_day
-```
+If a value is ever refused, a value you have seen the API **return** is the one to trust.
+That was the whole rule while the document could not be relied on, and it is still the
+cheapest way to settle a disagreement.
 
-Nobody names an API value `days_after_e_o_m`. Those are `DaysAfterEOM` and `DaysEOMXthDay`
-with the converter splitting the acronym letter by letter, and `CreatePaymentTerm.type` is a
-**request body** field, so a caller following the document sends a value the parser has never
-heard of.
+### If you created freight purchase orders before September 2026, check them
 
-Four values are mangled that obviously. Thirty-one of the seventy-five enum declarations in
-the document are snake_case and share the same origin, so any of them may differ from the
-wire value, and the reporting `report_type` values are the counter-example that they are not
-all wrong: those are real and work as published.
+`POST /v1/purchase_orders` takes a `type`, and the reference used to document two values for
+it, `Regular Order` and `Freight Order`. Neither was accepted. Both were parsed against
+identifiers containing no spaces, so both failed to match and fell through to the
+regular-order default, returning `200` with no warning.
 
-So, in order of reliability:
+This is fixed. `type` now publishes `RegularPO`, `FreightPO` and `DropShipPo`, the legacy
+spellings with spaces are accepted as well, and an unrecognised value is rejected rather
+than quietly becoming a regular order.
 
-1. A value you have seen the API **return** in a response is correct. Prefer it.
-2. A value an endpoint's own prose description spells out is usually correct.
-3. A value from the enum list alone is a hint. On a write path, send it once and check the
-   result rather than assuming, because the failure mode here is not always an error: an
-   unparsed value can fall through to a default and give you a record of the wrong type with
-   a `200` and no warning.
-
-This is known and filed. Until it is fixed, treat enums on request bodies as the place to
-check first.
-
-### One live instance, because it costs you data rather than an error
-
-`POST /v1/purchase_orders` takes a `type`, and the reference documents two values for it,
-`Regular Order` and `Freight Order`. **Neither is accepted** (checked 2026-09-13). They are
-parsed against identifiers that contain no spaces, so both fail to match and fall through to
-the regular-order default.
-
-The result is a purchase order of the wrong type, returned with `200` and no warning. If you
-have been creating freight orders through the API by following the documentation, they are
-regular orders, and nothing will have told you.
-
-The accepted value is the spelling the API itself uses. To find it without guessing, create
-one freight purchase order in the Qoblex web app, read it back through
-`GET /v1/purchase_orders/{id}`, and use the `type` exactly as it comes back. That is the
-rule from the list above, rank 1: a value you have seen the API return is correct, and here
-it is the only source that is.
-
-Worth doing rather than copying a value from here, because this field is being remodelled
-and the spelling may change with it.
+The bug is gone; its output is not. **Purchase orders raised through the API as freight
+before this shipped are regular orders in your data**, and nothing ever raised an error to
+say so. If you run an integration that creates freight POs, it is worth checking what type
+they actually carry.
 
 **On `405`: updates are often `POST`, not `PUT` or `PATCH`.** `POST /v1/products/{id}` is
 Update Product. `POST /v1/sale_orders/{id}` is Update Sale Order. `POST
@@ -508,6 +490,16 @@ grouped by supplier and takes `supplier_ids`. Use it rather than paging
 already arrived. Note this endpoint uses the second filter dialect: see
 [conventions](conventions.md#there-are-two-filter-engines-and-they-are-not-compatible).
 
+### Which of our POs are drop-ship
+
+`GET /v1/purchase_orders?filters=type=="DropShipPo"`. The `type` field was remodelled in
+September 2026 and is now filterable, with three values: `RegularPO`, `FreightPO` and
+`DropShipPo`. Freight orders are the landed-cost ones, billed but never received, so
+excluding them is usually what you want when you are counting goods on order.
+
+Remember this endpoint takes the second filter dialect, so string values are double-quoted:
+see [conventions](conventions.md#there-are-two-filter-engines-and-they-are-not-compatible).
+
 ### Raise the purchase orders for a set of sale orders
 
 `GET /v1/sale_orders/preview_purchase_orders` shows what would be created and creates
@@ -613,7 +605,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 5 endpoints.
 
@@ -685,7 +677,7 @@ list to only locations available on purchase orders, or only those allowed to ho
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the location. |
 | `name` | string |  | Name of the location. |
-| `type` | enum(`warehouse`, `billing`, `dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
+| `type` | enum(`Warehouse`, `Billing`, `Dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
 | `available_in_purchase_orders` | boolean |  | Whether this location can be used in purchase orders. |
 | `address` | LocationAddress |  | The location's address. |
 
@@ -711,7 +703,7 @@ Retrieves the details of a single location by its identifier, such as its name, 
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the location. |
 | `name` | string |  | Name of the location. |
-| `type` | enum(`warehouse`, `billing`, `dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
+| `type` | enum(`Warehouse`, `Billing`, `Dropship`) |  | The kind of location this is. Accepted values: `Billing`, `Warehouse`, `Dropship`. |
 | `available_in_purchase_orders` | boolean |  | Whether this location can be used in purchase orders. |
 | `address` | LocationAddress |  | The location's address. |
 
@@ -751,7 +743,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 1 endpoint.
 
@@ -798,7 +790,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 12 endpoints.
 
@@ -857,6 +849,7 @@ inventory - Warehouse locations only can be adjusted. New adjustments always sta
 | `line_items` | AdjustmentItemDto[] |  | The line items created or modified by this operation. Only items touched by the request are included; unchanged lines are omitted. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -866,7 +859,7 @@ inventory - Warehouse locations only can be adjusted. New adjustments always sta
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -894,6 +887,7 @@ stocktake and its current state.
 | --- | --- | --- | --- |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -903,7 +897,7 @@ stocktake and its current state.
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -942,6 +936,7 @@ single request.
 | `line_items` | AdjustmentItemDto[] |  | The line items created or modified by this operation. Only items touched by the request are included; unchanged lines are omitted. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -951,7 +946,7 @@ single request.
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -1009,6 +1004,7 @@ allocations in `line_items` and authorize in one request, instead of a separate 
 | --- | --- | --- | --- |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -1018,7 +1014,7 @@ allocations in `line_items` and authorize in one request, instead of a separate 
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -1089,6 +1085,7 @@ is never modified.
 | `line_items` | AdjustmentItemDto[] |  | The line items created or modified by this operation. Only items touched by the request are included; unchanged lines are omitted. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -1098,7 +1095,7 @@ is never modified.
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -1124,8 +1121,8 @@ Filterable/sortable properties: `id`, `product_variant.name`, `sku`,
 | --- | --- | --- | --- | --- |
 | `id` | path | integer (int64) | yes | The unique identifier of the adjustment. For example, `1024`. |
 | `page` | query | integer (int32) |  | Page number to return. |
-| `filters` | query | string |  | A filter expression used to narrow the results, for example `name@=shirt,quantity>10`. See the Filtering and sorting section in the API overview for the full list of operators and syntax. |
-| `sort_by` | query | string |  | A sort expression: a comma-separated list of fields, each optionally prefixed with `-` for descending order. See the Filtering and sorting section in the API overview. |
+| `filters` | query | string |  | A filter expression used to narrow the results. Filterable fields: - `id` - `adjustment_id` - `product_variant.id`, `product_variant.product_id`, `product_variant.name`, `product_variant.sku`, `product_variant.barcode`, `product_variant.is_batch_tracked` - `reconciliation_status` — `Pending`, `Resolved` or `Conflict`. - `previous_quantity`, `quantity`, `previous_cost`, `cost`, `quantity_variance`, `cost_variance` - `count_agreement` — `Agreed` or `Disagreed`. |
+| `sort_by` | query | string |  | A sort expression: a comma-separated list of fields, each optionally prefixed with `-` for descending order. `count_agreement` is filter-only and cannot be sorted on. |
 | `expand` | query | string |  | Comma-separated list of relations to expand in the response. Supported values: - `session_lines`: include stocktake scan lines recorded per user for each item - `batch_usages`: include batch/lot allocations recorded for each batch-tracked item |
 
 **Response** `200` `AdjustmentItemDtoListResponse`
@@ -1178,8 +1175,11 @@ Every line to reconcile is listed in `items` by `line_item_id`. By default
 (`strategy: SetQuantity`) the caller also supplies `final_quantity` per line, as a
 single admin decision typed for one line at a time. To reconcile several selected lines at
 once without typing a quantity for each one, set `strategy` to `AcceptScanner`,
-`Merge`, `AcceptSystem`, or `AcceptSuggestion`; `final_quantity` is then
-ignored and the final quantity for each line is computed from the scanners' counts instead.
+`Merge`, `AcceptSystem`, `AcceptSuggestion`, `AcceptMin`, or `AcceptMax`;
+`final_quantity` is then ignored and the final quantity for each line is computed from the
+scanners' counts instead. `Merge` sums the scanners' counts, for stocktakes where each
+scanner counted a different part of the location; `AcceptMin` and `AcceptMax` take the
+lowest and the highest count, for stocktakes where scanners counted the same stock and disagreed.
 A line that cannot be resolved with the chosen strategy (for example, the chosen scanner
 never counted it) is skipped rather than failing the request, and reported back in
 `skipped_lines`.
@@ -1192,7 +1192,7 @@ never counted it) is skipped rather than failing the request, and reported back 
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `strategy` | enum(`set_quantity`, `accept_scanner`, `merge`, `accept_system`, `accept_suggestion`) |  | How the final quantity is determined for each line in `items`. Defaults to `SetQuantity`, which writes the `final_quantity` supplied for each line. The other strategies ignore `final_quantity` and compute it from the scanners' counts instead. |
+| `strategy` | enum(`SetQuantity`, `AcceptScanner`, `Merge`, `AcceptSystem`, `AcceptSuggestion`, `AcceptMin`, `AcceptMax`) |  | How the final quantity is determined for each line in `items`. Defaults to `SetQuantity`, which writes the `final_quantity` supplied for each line. The other strategies ignore `final_quantity` and compute it from the scanners' counts instead. |
 | `user_id` | integer (int32) |  | The user whose scan counts to use. Required when `strategy` is `AcceptScanner`. |
 | `items` | ReconcileAdjustmentItem[] |  | The lines to reconcile. Every line is identified by `line_item_id`; `final_quantity` is required only when `strategy` is `SetQuantity` and is otherwise ignored, since the other strategies compute the final quantity from the scanners' counts. Lines that cannot be resolved with the chosen strategy are skipped and reported in the response instead of failing the whole request. |
 
@@ -1206,6 +1206,7 @@ never counted it) is skipped rather than failing the request, and reported back 
 | `skipped_lines` | SkippedReconciliationLine[] |  | Lines that could not be reconciled with the chosen strategy, and why. Every line requested by a `SetQuantity` reconcile is always applied, so this is only ever populated for the other bulk strategies. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -1215,7 +1216,7 @@ never counted it) is skipped rather than failing the request, and reported back 
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -1279,7 +1280,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 4 endpoints.
 
@@ -1399,7 +1400,7 @@ manufacturing orders.
 | Parameter | In | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | `batch_id` | path | integer (int32) | yes | Unique identifier of the batch to trace. Example: `9032`. |
-| `direction` | query | enum(`upstream`, `downstream`, `both`) |  | The tracing direction. |
+| `direction` | query | enum(`Upstream`, `Downstream`, `Both`) |  | The tracing direction. |
 
 **Response** `200` `BatchTrace`
 
@@ -1424,7 +1425,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 3 endpoints.
 
@@ -1457,7 +1458,6 @@ Payments can only be added to bills that have been authorized.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -1468,7 +1468,7 @@ Payments can only be added to bills that have been authorized.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -1492,6 +1492,7 @@ Payments can only be added to bills that have been authorized.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/payments' \
@@ -1530,7 +1531,6 @@ Updates a payment already recorded against a bill, for example to correct its am
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -1541,7 +1541,7 @@ Updates a payment already recorded against a bill, for example to correct its am
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -1565,6 +1565,7 @@ Updates a payment already recorded against a bill, for example to correct its am
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/payments/{payment_id}' \
@@ -1592,7 +1593,6 @@ that amount to the bill's amount due.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -1603,7 +1603,7 @@ that amount to the bill's amount due.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -1627,6 +1627,7 @@ that amount to the bill's amount due.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/payments/{payment_id}' \
@@ -1644,7 +1645,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 8 endpoints.
 
@@ -1672,7 +1673,6 @@ it's ready to be paid.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -1683,7 +1683,7 @@ it's ready to be paid.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -1707,6 +1707,7 @@ it's ready to be paid.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills' \
@@ -1832,7 +1833,6 @@ Only drafts can be deleted, authorize must be reverted first.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -1843,7 +1843,7 @@ Only drafts can be deleted, authorize must be reverted first.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -1867,6 +1867,7 @@ Only drafts can be deleted, authorize must be reverted first.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}' \
@@ -1891,7 +1892,6 @@ for payment. This is the step that turns a draft into a payable liability.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -1902,7 +1902,7 @@ for payment. This is the step that turns a draft into a payable liability.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -1926,6 +1926,7 @@ for payment. This is the step that turns a draft into a payable liability.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/authorize' \
@@ -2036,7 +2037,6 @@ owed to the supplier.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -2047,7 +2047,7 @@ owed to the supplier.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -2071,6 +2071,7 @@ owed to the supplier.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/bills/{bill_id}/unauthorize' \
@@ -2088,7 +2089,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 4 endpoints.
 
@@ -2239,7 +2240,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 2 endpoints.
 
@@ -2284,7 +2285,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 9 endpoints.
 
@@ -2328,7 +2329,7 @@ details your business tracks that the standard record does not hold.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `owner_type` | enum(`order`, `product`, `contact`) |  | Type of entity the custom field belongs to. |
+| `owner_type` | enum(`Order`, `Product`, `Contact`) |  | Type of entity the custom field belongs to. |
 | `owner_id` | integer (int32) |  | Identifier of the entity the custom field is attached to. |
 | `key` | string |  | Internal key or name of the custom field. |
 | `value` | string |  | Value to store in the custom field. |
@@ -2393,7 +2394,7 @@ your team has already defined to the records where you want to capture their val
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `owner_type` | enum(`order`, `product`, `contact`) |  | Type of entity the custom fields will be assigned to. |
+| `owner_type` | enum(`Order`, `Product`, `Contact`) |  | Type of entity the custom fields will be assigned to. |
 | `owner_id` | integer (int32) |  | Identifier of the entity receiving the custom fields. |
 
 **Response** `200`
@@ -2467,7 +2468,7 @@ The key must be unique for that record type.
 | `value_type` | string |  | Data type of the field. |
 | `namespace` | string |  | Namespace used to group custom fields logically. |
 | `options` | string |  | Available options for dropdown-type fields. |
-| `owner_type` | enum(`order`, `product`, `contact`) |  | Entity type this field belongs to. |
+| `owner_type` | enum(`Order`, `Product`, `Contact`) |  | Entity type this field belongs to. |
 | `is_editable` | boolean |  | Indicates whether the field can be edited by users. |
 
 **Response** `200` `CustomField`
@@ -2608,7 +2609,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 3 endpoints.
 
@@ -2758,7 +2759,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 9 endpoints.
 
@@ -2787,7 +2788,6 @@ requires payment before shipping. You can later allocate the deposit towards a b
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -2798,7 +2798,7 @@ requires payment before shipping. You can later allocate the deposit towards a b
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -2822,6 +2822,7 @@ requires payment before shipping. You can later allocate the deposit towards a b
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/deposits' \
@@ -2859,7 +2860,6 @@ bill - remove the allocation first.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -2870,7 +2870,7 @@ bill - remove the allocation first.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -2894,6 +2894,7 @@ bill - remove the allocation first.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/deposits/{deposit_id}' \
@@ -2919,7 +2920,6 @@ Permanently removes a supplier deposit from a purchase order, for example one re
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -2930,7 +2930,7 @@ Permanently removes a supplier deposit from a purchase order, for example one re
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -2954,6 +2954,7 @@ Permanently removes a supplier deposit from a purchase order, for example one re
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/deposits/{deposit_id}' \
@@ -2979,7 +2980,6 @@ bill rather than paying it again.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -2990,7 +2990,7 @@ bill rather than paying it again.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -3014,6 +3014,7 @@ bill rather than paying it again.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/deposits/{deposit_id}/allocations/{bill_id}' \
@@ -3039,7 +3040,6 @@ elsewhere or the bill's amount due can be paid another way.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -3050,7 +3050,7 @@ elsewhere or the bill's amount due can be paid another way.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -3074,6 +3074,7 @@ elsewhere or the bill's amount due can be paid another way.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/deposits/{deposit_id}/allocations/{bill_id}' \
@@ -3105,7 +3106,6 @@ once it's ready.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -3116,7 +3116,7 @@ once it's ready.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -3140,6 +3140,7 @@ once it's ready.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/refunds' \
@@ -3166,7 +3167,6 @@ error. Only drafts can be deleted.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -3177,7 +3177,7 @@ error. Only drafts can be deleted.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -3201,6 +3201,7 @@ error. Only drafts can be deleted.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/refunds/{refund_id}' \
@@ -3225,7 +3226,6 @@ refunds can be authorized.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -3236,7 +3236,7 @@ refunds can be authorized.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -3260,6 +3260,7 @@ refunds can be authorized.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/refunds/{refund_id}/authorize' \
@@ -3305,7 +3306,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 7 endpoints.
 
@@ -3542,7 +3543,7 @@ several batches, and set expiry dates on batches where that applies.
 | `created_at` | string (date-time) |  | Timestamp when the batch record was created. |
 | `authorized_at` | string (date-time) |  | Timestamp when the batch transaction was authorized. |
 | `closing_quantity` | number (double) |  | Total stock quantity in this batch after the transaction. |
-| `type` | enum(`none`, `transfer`, `adjustment`, `shipment`, `goods_receipt_note`, `assembly_order`, `reverse_shipment`, `sale_return`, `supplier_return`) |  | Type of inventory transaction. |
+| `type` | enum(`None`, `Transfer`, `Adjustment`, `Shipment`, `GoodsReceiptNote`, `AssemblyOrder`, `ReverseShipment`, `SaleReturn`, `SupplierReturn`) |  | Type of inventory transaction. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/goods_receipt_notes/{grn_id}/batches' \
@@ -3598,7 +3599,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 3 endpoints.
 
@@ -3664,9 +3665,9 @@ once it's ready to count toward payment and reporting.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -3785,9 +3786,9 @@ base currency.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -3816,7 +3817,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 7 endpoints.
 
@@ -4149,9 +4150,9 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
-2 endpoints.
+4 endpoints.
 
 ### GET /v1/price_lists
 
@@ -4176,6 +4177,68 @@ apply across your customer base.
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/price_lists' \
+  -H 'qoblex-x-api-key: '"$QOBLEX_API_KEY"
+```
+
+### POST /v1/price_lists/csv
+
+**Import Price Lists CSV**
+
+Uploads a price list CSV and applies it in the background, one page of rows at a time, so a
+large catalog no longer times out the request. Only prices that differ from what is already
+stored are written, so re-sending an unmodified export changes nothing. Rows whose ID does
+not match a product variant on your account are skipped and reported on the finished job.
+Poll the returned job via `GET /v1/jobs` to follow progress and completion.
+
+**Request body**
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `ContentType` | string |  |  |
+| `ContentDisposition` | string |  |  |
+| `Headers` | object |  |  |
+| `Length` | integer (int64) |  |  |
+| `Name` | string |  |  |
+| `FileName` | string |  |  |
+
+**Response** `200` `Job`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | string |  | Unique identifier of the job. |
+| `name` | string |  | Name of the job. |
+| `status` | string |  | Status of the job. |
+| `output` | string |  | Extra metadata associated with the job. |
+
+```bash
+curl -sS 'https://api.qoblex.com/v1/price_lists/csv' \
+  -X POST \
+  -H 'qoblex-x-api-key: '"$QOBLEX_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{ }'
+```
+
+### POST /v1/price_lists/export
+
+**Export Price Lists CSV**
+
+Prepares a CSV of every product variant pre-filled with its current price in each of your
+price lists, in the background so a large catalog never times out the request. Edit the file
+and send it back to `POST /v1/price_lists/csv` to apply your changes. Poll the returned
+job via `GET /v1/jobs`; once it completes, the job's output is a signed download URL.
+
+**Response** `200` `Job`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | string |  | Unique identifier of the job. |
+| `name` | string |  | Name of the job. |
+| `status` | string |  | Status of the job. |
+| `output` | string |  | Extra metadata associated with the job. |
+
+```bash
+curl -sS 'https://api.qoblex.com/v1/price_lists/export' \
+  -X POST \
   -H 'qoblex-x-api-key: '"$QOBLEX_API_KEY"
 ```
 
@@ -4212,7 +4275,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 12 endpoints.
 
@@ -4647,9 +4710,9 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
-22 endpoints.
+23 endpoints.
 
 ### GET /v1/purchase_orders
 
@@ -4662,8 +4725,8 @@ what you've ordered from suppliers, then page through the full set to build your
 | --- | --- | --- | --- | --- |
 | `page` | query | integer (int32) |  | Specifies the page number for pagination. |
 | `expand` | query | string |  | Comma-separated list of related resources to include in the response. Supported values: - `supplier` — include the supplier's name on the order. - `bills` — include the bills linked to the order. - `grns` — include the goods receipt notes linked to the order. - `line_items.product_variant` — include each line item's variant details (sku, name, cost, image). - `drop_ship_order` — for a drop-ship order, include the sale order it was raised for. |
-| `filters` | query | string |  | Filters to apply on the purchase list: property operator value. Supported properties: - `id` - `number` - `currency` - `supplier_id` - `supplier.name` - `supplier_reference` - `status` - `billing_status` - `receiving_status` - `sub_type` - `created_at` - `estimated_delivery_date` - `payment_status` - `location` — the receiving location id. - `tag` - `shipped_at` — matches if any linked goods receipt was shipped/received on the given date. - `deleted` — soft-deleted orders are included by default; filter `deleted==false` to exclude them. Supported operators: `==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal) `<=` (less than or equal) String values must be double-quoted (e.g. `supplier.name@=*"acme"`). Combine multiple filters with `,` (AND) or `\|` (OR), with a space on each side of the operator. |
-| `sort_by` | query | string |  | Sorting to apply on the purchase list: prefix with - for descending, no prefix for ascending. Multiple sorts can be combined using commas. Defaults to `-created_at` (newest first) when omitted. Supported properties: - `id` - `number` - `currency` - `supplier.name` - `supplier_reference` - `status` - `billing_status` - `receiving_status` - `sub_type` - `created_at` - `estimated_delivery_date` - `payment_status` - `location` - `tag` - `deleted` Sorting is not supported on `supplier_id` or `shipped_at` (a to-many relation). Supported operators: `name` (ascending), `-name` (descending), `name,-date` (name ascending then date descending) |
+| `filters` | query | string |  | Filters to apply on the purchase list: property operator value. Supported properties: - `id` - `number` - `currency` - `supplier_id` - `supplier.name` - `supplier_reference` - `status` - `billing_status` - `receiving_status` - `type` — one of `RegularPO`, `FreightPO`, `DropShipPo`. - `created_at` - `estimated_delivery_date` - `payment_status` - `location` — the receiving location id. - `tag` - `shipped_at` — matches if any linked goods receipt was shipped/received on the given date. - `deleted` — soft-deleted orders are included by default; filter `deleted==false` to exclude them. Supported operators: `==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal) `<=` (less than or equal) String values must be double-quoted (e.g. `supplier.name@=*"acme"`). Combine multiple filters with `,` (AND) or `\|` (OR), with a space on each side of the operator. |
+| `sort_by` | query | string |  | Sorting to apply on the purchase list: prefix with - for descending, no prefix for ascending. Multiple sorts can be combined using commas. Defaults to `-created_at` (newest first) when omitted. Supported properties: - `id` - `number` - `currency` - `supplier.name` - `supplier_reference` - `status` - `billing_status` - `receiving_status` - `type` - `created_at` - `estimated_delivery_date` - `payment_status` - `location` - `tag` - `deleted` Sorting is not supported on `supplier_id` or `shipped_at` (a to-many relation). Supported operators: `name` (ascending), `-name` (descending), `name,-date` (name ascending then date descending) |
 
 **Response** `200` `PurchaseOrderListResponse`
 
@@ -4705,14 +4768,13 @@ additional costs such as freight or insurance (landed costs and expenses).
 | `comments` | string |  | Additional notes or comments visible to the supplier. |
 | `private_notes` | string |  | Internal notes not shared with the supplier. |
 | `tags` | string |  | Tags for categorization or filtering. |
-| `type` | string |  | Type of the purchase order. - `Regular Order` - `Freight Order` |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order. Defaults to `RegularPO` when omitted. - `RegularPO` — stock bought from a supplier and received into a location. - `FreightPO` — freight and other landed costs, billed but never received. - `DropShipPo` — raised so the supplier ships straight to your customer. The spellings `Regular Order`, `Freight Order` and `Drop Ship Order` are also accepted. Any other value is rejected. |
 
 **Response** `200` `PurchaseOrder`
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -4723,7 +4785,7 @@ additional costs such as freight or insurance (landed costs and expenses).
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -4747,6 +4809,7 @@ additional costs such as freight or insurance (landed costs and expenses).
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders' \
@@ -4768,14 +4831,13 @@ full order view without extra requests.
 | Parameter | In | Type | Required | Description |
 | --- | --- | --- | --- | --- |
 | `id` | path | integer (int64) | yes | The unique identifier of the purchase order. |
-| `expand` | query | string |  | Comma-separated list of related resources to include in the response. Supported values: - `supplier` — include the supplier's name on the order. - `bills` — include the bills linked to the order. - `grns` — include the goods receipt notes linked to the order. - `line_items.product_variant` — include each line item's variant details (sku, name, cost, image). - `drop_ship_order` — for a drop-ship order, include the sale order it was raised for. - `deposits` — include the supplier deposits recorded against the order. - `refunds` — include the supplier refunds recorded against the order. - `supplier_returns` — include the supplier returns linked to the order. |
+| `expand` | query | string |  | Comma-separated list of related resources to include in the response. Supported values: - `supplier` — include the supplier's name on the order. - `bills` — include the bills linked to the order. - `grns` — include the goods receipt notes linked to the order. - `line_items.product_variant` — include each line item's variant details (sku, name, cost, image). - `drop_ship_order` — for a drop-ship order, include the sale order it was raised for. - `deposits` — include the supplier deposits recorded against the order. - `refunds` — include the supplier refunds recorded against the order. - `supplier_returns` — include the supplier returns linked to the order. - `related_orders` — include other orders linked to this order (e.g. a back-order, or the sale order it drop-ships for). |
 
 **Response** `200` `PurchaseOrder`
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -4786,7 +4848,7 @@ full order view without extra requests.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -4810,6 +4872,7 @@ full order view without extra requests.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}' \
@@ -4852,7 +4915,6 @@ are added, entries with an existing Id are updated. To remove a line, use the de
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -4863,7 +4925,7 @@ are added, entries with an existing Id are updated. To remove a line, use the de
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -4887,6 +4949,7 @@ are added, entries with an existing Id are updated. To remove a line, use the de
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}' \
@@ -4912,7 +4975,6 @@ receiving and billing stages. Only draft purchase orders can be approved.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -4923,7 +4985,7 @@ receiving and billing stages. Only draft purchase orders can be approved.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -4947,6 +5009,7 @@ receiving and billing stages. Only draft purchase orders can be approved.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/approve' \
@@ -5089,7 +5152,6 @@ has left, which is reported when that goods receipt note is authorized.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -5100,7 +5162,7 @@ has left, which is reported when that goods receipt note is authorized.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -5124,6 +5186,7 @@ has left, which is reported when that goods receipt note is authorized.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/backorder' \
@@ -5156,7 +5219,6 @@ close it only once every ordered item has been fully received.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -5167,7 +5229,7 @@ close it only once every ordered item has been fully received.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -5191,6 +5253,7 @@ close it only once every ordered item has been fully received.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/close' \
@@ -5218,7 +5281,6 @@ and status are never carried over, the new order always starts as an untouched D
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -5229,7 +5291,7 @@ and status are never carried over, the new order always starts as an untouched D
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -5253,6 +5315,7 @@ and status are never carried over, the new order always starts as an untouched D
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/duplicate' \
@@ -5282,7 +5345,6 @@ charge that no longer applies. The batch is applied together, so either every it
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -5293,7 +5355,7 @@ charge that no longer applies. The batch is applied together, so either every it
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -5317,6 +5379,7 @@ charge that no longer applies. The batch is applied together, so either every it
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/landed_costs' \
@@ -5350,7 +5413,6 @@ have been received or billed.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -5361,7 +5423,7 @@ have been received or billed.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -5385,6 +5447,7 @@ have been received or billed.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/line_items' \
@@ -5486,7 +5549,6 @@ for example a drop-ship sale order or a backorder that this purchase fulfills.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -5497,7 +5559,7 @@ for example a drop-ship sale order or a backorder that this purchase fulfills.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -5521,6 +5583,7 @@ for example a drop-ship sale order or a backorder that this purchase fulfills.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/link' \
@@ -5547,7 +5610,6 @@ longer relevant. The linked order itself is untouched, only the connection betwe
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -5558,7 +5620,7 @@ longer relevant. The linked order itself is untouched, only the connection betwe
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -5582,6 +5644,7 @@ longer relevant. The linked order itself is untouched, only the connection betwe
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/link/{target_id}' \
@@ -5693,6 +5756,37 @@ curl -sS 'https://api.qoblex.com/v1/purchase_orders/bulk/csv/template' \
   -H 'qoblex-x-api-key: '"$QOBLEX_API_KEY"
 ```
 
+### GET /v1/purchase_orders/linkable_orders
+
+**Search Linkable Orders**
+
+Searches across your sale, purchase, and production orders using a QueryKit `filters` expression
+(e.g. matching on `number` or `contact.name`). Use this to find candidate orders to link to a
+purchase order, for example a back-order or the sale order it drop-ships for. Restrict to specific order
+types and exclude ids (typically the purchase order you're linking from, plus any orders already linked
+to it) to narrow the results to orders that are actually eligible to be linked.
+
+| Parameter | In | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| `filters` | query | string |  | Filters to apply to the search: property operator value. Supported properties: - `id` - `number` - `author_name` - `status` - `type` - `sub_type` - `created_at` Supported operators: `==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal), `<=` (less than or equal) String values must be double-quoted. Combine multiple filters with `,` (AND) or `\|` (OR), with a space on each side of the operator. A free-text search box should filter on both `number` and `author_name`, e.g. `number@=*"PO-001" \| author_name@=*"PO-001"`. |
+| `types` | query | string |  | Comma-separated list of order types to restrict the search to. Omit to search across all order types. Supported values: `Sale`, `Purchase`, `ProductionAssembly`, `ProductionDisassembly`. |
+| `exclude_order_ids` | query | string |  | Comma-separated list of order ids to exclude from the results — typically the order you're linking from, plus any orders already linked to it. |
+| `page` | query | integer (int32) |  | Specifies the page number for pagination. |
+| `sort_by` | query | string |  | Sorting to apply to the results: prefix with - for descending, no prefix for ascending. Defaults to `-created_at` (newest first) when omitted. Supported properties: `id`, `number`, `author_name`, `created_at`. |
+
+**Response** `200` `LinkableOrderListResponse`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `lines` | LinkableOrder[] |  | The list of items. |
+| `count` | integer (int32) |  | The total number of items in the list. |
+| `filtered_count` | integer (int32) |  | The total number of items in the list after applying filters, if any. |
+
+```bash
+curl -sS 'https://api.qoblex.com/v1/purchase_orders/linkable_orders' \
+  -H 'qoblex-x-api-key: '"$QOBLEX_API_KEY"
+```
+
 ### GET /v1/purchase_orders/open_purchases
 
 **List Open Purchase Orders**
@@ -5703,7 +5797,6 @@ Filter by one or more supplier IDs to narrow the results to specific suppliers.
 
 | Parameter | In | Type | Required | Description |
 | --- | --- | --- | --- | --- |
-| `tenant_id` | query | integer (int32) |  | Filter results by a specific tenant. |
 | `supplier_ids` | query | integer (int32)[] |  | Filter results to only include purchase orders from specific suppliers. Pass multiple values to filter by several suppliers at once. |
 
 **Response** `200` `ListMergerPurchasesResponse`
@@ -5727,7 +5820,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 1 endpoint.
 
@@ -5770,7 +5863,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 7 endpoints.
 
@@ -5835,9 +5928,9 @@ selected items.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -5918,9 +6011,9 @@ keep adjusting it until it's ready to authorize.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -5994,9 +6087,9 @@ a committed credit to the customer.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -6111,9 +6204,9 @@ customer is sending back the whole order or just a few items.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -6187,9 +6280,9 @@ back.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -6252,7 +6345,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 5 endpoints.
 
@@ -6336,7 +6429,7 @@ request parameter that selects the report. Each is listed below.
 | `product.name` | string |  | Display name of the product. |
 | `sku` | string |  | The variant's SKU. |
 | `barcode` | string |  | The variant's barcode. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Current lifecycle state of the variant (for example active or archived). |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Current lifecycle state of the variant (for example active or archived). |
 | `quantity` | number (double) |  | Units sold over the historical period being analysed. |
 | `quantity_returned` | number (double) |  | Units returned by customers over the historical period. |
 | `cancelled_quantity` | number (double) |  | Units on cancelled orders over the historical period. |
@@ -6347,8 +6440,8 @@ request parameter that selects the report. Each is listed below.
 | `projected_stock` | ForecastingProjectedStock[] |  | Week-by-week projection of expected stock on hand across the forecast horizon. |
 | `projected_incomings` | ForecastingIncomingPeriod[] |  | Incoming stock expected to arrive during the forecast horizon, by period. |
 | `projected_purchase_orders` | ForecastingProjectedPurchaseOrder[] |  | Suggested purchase orders to place to avoid running out of stock. |
-| `variant_type` | enum(`simple`, `bundle`, `component`) |  | Whether the variant is a simple item, a bundle, or a bundle component. |
-| `forecast_method` | enum(`historical_average_weekly_sales`, `seasonal`, `trend`) |  | The forecasting method used to project demand for this variant. |
+| `variant_type` | enum(`Simple`, `Bundle`, `Component`) |  | Whether the variant is a simple item, a bundle, or a bundle component. |
+| `forecast_method` | enum(`HistoricalAverageWeeklySales`, `Seasonal`, `Trend`) |  | The forecasting method used to project demand for this variant. |
 | `stockout_days` | integer (int32) |  | Number of days the variant was out of stock during the historical period. |
 | `total_sales` | number (double) |  | Total sales revenue for the variant over the historical period. |
 | `margin` | number (double) |  | Total profit margin for the variant over the historical period. |
@@ -6406,10 +6499,10 @@ it is moving.
 | `count` | integer (int32) |  | Total number of report records available. |
 | `filtered_count` | integer (int32) |  | Number of report records after filters are applied. |
 | `has_next_page` | boolean |  | Whether another page of results exists, when pagination applies. |
-| `lines` | StockMovementLineItem \| GroupedStockMovementLineItem \| StockOnHandInventoryItem \| InventoryItem \| InventoryTurnoverLineItem \| GroupedInventoryTurnoverLineItem \| InventoryReorderItem \| InventoryAgingLineItem \| GroupedInventoryAgingLineItem[] |  | The report rows. Which shape you get depends on the report_type you requested; each option below corresponds to a report type (its grouped variant is used when you group the report). |
+| `lines` | StockMovementLineItem \| GroupedStockMovementLineItem \| StockOnHandInventoryItem \| GroupedInventoryItem \| InventoryItem \| GroupedAllocationItem \| InventoryTurnoverLineItem \| GroupedInventoryTurnoverLineItem \| InventoryReorderItem \| InventoryAgingLineItem \| GroupedInventoryAgingLineItem[] |  | The report rows. Which shape you get depends on the report_type you requested; each option below corresponds to a report type (its grouped variant is used when you group the report). |
 | `summary` | StockMovementSummary \| StockOnHandInventoryItemSummary |  | Aggregated totals for the report, present when a summary is requested and available for the report type. |
 
-`lines` is one of 9 row shapes, chosen by the
+`lines` is one of 11 row shapes, chosen by the
 request parameter that selects the report. Each is listed below.
 
 <details>
@@ -6450,7 +6543,7 @@ request parameter that selects the report. Each is listed below.
 | `manufactured_value` | number (double) |  | Value of stock produced through manufacturing during the period. |
 | `transfer_quantity` | number (double) |  | Net quantity moved between locations during the period. |
 | `transfer_value` | number (double) |  | Net value moved between locations during the period. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 
 </details>
 
@@ -6504,7 +6597,7 @@ request parameter that selects the report. Each is listed below.
 | `brand.dim_id` | integer (int64) |  | Identifier of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
 | `product_type.dim_id` | integer (int64) |  | Identifier of the product type. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `supplier.name` | string |  | Display name of the supplier. |
 | `supplier.dim_id` | integer (int64) |  | Identifier of the supplier. |
 | `updated_at` | string (date-time) |  | When this product's stock was last updated. |
@@ -6527,6 +6620,22 @@ request parameter that selects the report. Each is listed below.
 </details>
 
 <details>
+<summary><code>GroupedInventoryItem</code></summary>
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `grouping_key` | object |  | The value this group is grouped by. |
+| `grouping_by_dim` | IGroupingDim |  |  |
+| `total_quantity` | number (double) |  | Total quantity of stock on hand for this group. |
+| `allocated_total_quantity` | number (double) |  | Total quantity reserved for open orders in this group. |
+| `available_total_quantity` | number (double) |  | Total quantity available to sell in this group after allocations. |
+| `incoming_total_quantity` | number (double) |  | Total quantity expected in from incoming purchase orders for this group. |
+| `buffer_total_quantity` | number (double) |  | Total buffer stock held back as a safety level for this group. |
+| `inventory_levels` | InventoryLevel[] |  | Per-location breakdown of stock levels for this group. |
+
+</details>
+
+<details>
 <summary><code>InventoryItem</code></summary>
 
 | Field | Type | Required | Description |
@@ -6539,7 +6648,7 @@ request parameter that selects the report. Each is listed below.
 | `image_url` | string |  | Image of the product. |
 | `barcode` | string |  | The product's barcode. |
 | `sku` | string |  | The product's SKU. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `brand.name` | string |  | Display name of the brand. |
 | `brand.dim_id` | integer (int64) |  | Identifier of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
@@ -6556,6 +6665,30 @@ request parameter that selects the report. Each is listed below.
 | `requested_quantity` | number (double) |  | Quantity requested across open orders. |
 | `on_back_order_quantity` | number (double) |  | Quantity on back order that could not be fulfilled from stock. |
 | `allocation_levels` | AllocationLevel[] |  | Per-order breakdown of how this product's stock is allocated. |
+
+</details>
+
+<details>
+<summary><code>GroupedAllocationItem</code></summary>
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `grouping_key` | object |  |  |
+| `grouping_by_dim` | IGroupingDim |  |  |
+| `brand_dim_ids` | integer (int64)[] |  |  |
+| `supplier_dim_ids` | integer (int64)[] |  |  |
+| `customer_dim_ids` | integer (int64)[] |  |  |
+| `integration_dim_ids` | integer (int64)[] |  |  |
+| `product_type_dim_ids` | integer (int64)[] |  |  |
+| `sale_channel_dim_ids` | integer (int64)[] |  |  |
+| `user_dim_ids` | integer (int64)[] |  |  |
+| `location_dim_ids` | integer (int64)[] |  |  |
+| `sale_order_dim_ids` | integer (int64)[] |  |  |
+| `production_order_dim_ids` | integer (int64)[] |  |  |
+| `variant_dim_ids` | integer (int64)[] |  |  |
+| `allocated_quantity` | number (double) |  |  |
+| `requested_quantity` | number (double) |  |  |
+| `on_back_order_quantity` | number (double) |  |  |
 
 </details>
 
@@ -6577,7 +6710,7 @@ request parameter that selects the report. Each is listed below.
 | `product.name` | string |  | Display name of the product. |
 | `image_url` | string |  | Image of the product. |
 | `sku` | string |  | The product's SKU. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `barcode` | string |  | The product's barcode. |
 | `cogs` | number (double) |  | Cost of goods sold for this product during the period. |
 | `daily_soh` | number (double) |  | Average value of stock on hand per day over the period. |
@@ -6624,7 +6757,7 @@ request parameter that selects the report. Each is listed below.
 | `brand.dim_id` | integer (int64) |  | Identifier of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
 | `product_type.dim_id` | integer (int64) |  | Identifier of the product type. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `supplier.name` | string |  | Display name of the supplier. |
 | `supplier.id` | integer (int64) |  | Identifier of the supplier. |
 | `supplier.dim_id` | integer (int64) |  | Identifier of the supplier. |
@@ -6661,7 +6794,7 @@ request parameter that selects the report. Each is listed below.
 | `image_url` | string |  | Image of the product. |
 | `product_variant_id` | integer (int64) |  | Identifier of the product variant. |
 | `sku` | string |  | The product's SKU. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `barcode` | string |  | The product's barcode. |
 | `value_aged_0_to_30_days` | number (double) |  | Stock value aged 0 to 30 days. |
 | `value_aged_31_to_60_days` | number (double) |  | Stock value aged 31 to 60 days. |
@@ -6771,7 +6904,7 @@ request parameter that selects the report. Each is listed below.
 | `product.dim_id` | integer (int64) |  | Identifier of the product variant this row rolls up to. |
 | `purchase.number` | string |  | The purchase order number. |
 | `created_on` | string (date-time) |  | The date the purchase order was created. |
-| `status` | enum(`draft`, `open`, `closed`, `deleted`) |  | The current status of the purchase order. |
+| `status` | enum(`Draft`, `Open`, `Closed`, `Deleted`) |  | The current status of the purchase order. |
 | `supplier.name` | string |  | The name of the supplier. |
 | `purchase_agent.name` | string |  | The name of the purchasing agent who placed the order. |
 | `brand.name` | string |  | The brand of the purchased product. |
@@ -6810,9 +6943,9 @@ request parameter that selects the report. Each is listed below.
 | `refund_date` | string (date-time) |  | The date the supplier refund was issued. |
 | `refund_tax` | number (double) |  | The tax credited on the supplier refund. |
 | `refund_amount` | number (double) |  | The amount credited on the supplier refund. |
-| `order_type` | enum(`regular`, `freight`, `drop_ship`) |  | The type of order this line belongs to. |
+| `order_type` | enum(`Regular`, `Freight`, `DropShip`) |  | The type of order this line belongs to. |
 | `purchase_order_id` | integer (int64) |  | Internal identifier of the purchase order this line belongs to. |
-| `line_type` | enum(`order_item`, `landed_cost`, `expense`) |  | The kind of line this row represents (for example an order, receipt, bill or return line). |
+| `line_type` | enum(`OrderItem`, `LandedCost`, `Expense`) |  | The kind of line this row represents (for example an order, receipt, bill or return line). |
 | `incoming_quantity` | number (double) |  | The quantity still expected to arrive from the supplier. |
 | `landed_cost_name` | string |  | The name of the landed cost applied to the line. |
 
@@ -6893,7 +7026,7 @@ request parameter that selects the report. Each is listed below.
 | `barcode` | string |  | The barcode of the purchased product. |
 | `created_at` | string (date-time) |  | The date the purchase order was created. |
 | `purchase.number` | string |  | The purchase order number. |
-| `status` | enum(`draft`, `open`, `closed`, `deleted`) |  | The current status of the purchase order. |
+| `status` | enum(`Draft`, `Open`, `Closed`, `Deleted`) |  | The current status of the purchase order. |
 | `purchase_agent.name` | string |  | The name of the purchasing agent who placed the order. |
 | `purchase_agent.dim_id` | integer (int64) |  | Identifier of the purchasing agent this row rolls up to. |
 | `supplier.dim_id` | integer (int64) |  | Identifier of the supplier this row rolls up to. |
@@ -7156,8 +7289,9 @@ request parameter that selects the report. Each is listed below.
 | `sale_order_id` | integer (int64) |  | Internal identifier of the sales order. |
 | `image_url` | string |  | Image URL for the product on this line. |
 | `product_id` | integer (int32) |  | Internal identifier of the product on this line. |
-| `status` | enum(`quote`, `open`, `closed`, `deleted`, `canceled`) |  | Current status of the sales order. |
+| `status` | enum(`Quote`, `Open`, `Closed`, `Deleted`, `Canceled`) |  | Current status of the sales order. |
 | `customer.name` | string |  | Display name of the customer. |
+| `customer_business_type` | enum(`Wholesale`, `Retailer`) |  | Business type of the customer. Null when the customer could not be resolved. |
 | `sale_agent.name` | string |  | Display name of the sales agent. |
 | `brand.name` | string |  | Display name of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
@@ -7183,7 +7317,7 @@ request parameter that selects the report. Each is listed below.
 | `margin_percentage` | number (double) |  | Margin as a percentage of net sales. |
 | `refund.number` | string |  | The refund number, if this line was refunded. |
 | `return.number` | string |  | The return number, if this line was returned. |
-| `return_type` | string |  | The type of return recorded for this line. |
+| `return_type` | enum(`None`, `Restock`, `NonRestock`, `Canceled`) |  | The type of return recorded for this line, or null when the line was not returned. |
 | `quantity_returned` | number (double) |  | Quantity returned on this line. |
 | `return_cogs` | number (double) |  | Cost of goods sold for the returned quantity. |
 | `refund_date` | string (date-time) |  | The date the refund was recorded. |
@@ -7197,7 +7331,7 @@ request parameter that selects the report. Each is listed below.
 | `shipment_cogs` | number (double) |  | Cost of goods sold for the shipped quantity. |
 | `invoice.number` | string |  | The invoice number, if this line was invoiced. |
 | `barcode` | string |  | The product's barcode. |
-| `line_type` | enum(`order_item`, `landed_cost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
+| `line_type` | enum(`OrderItem`, `LandedCost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
 | `invoice_date` | string (date-time) |  | The date the invoice was recorded. |
 | `invoice_quantity` | number (double) |  | Quantity invoiced on this line. |
 | `total_invoice` | number (double) |  | Total invoiced value for this line. |
@@ -7285,7 +7419,7 @@ request parameter that selects the report. Each is listed below.
 | `sale_order_id` | integer (int64) |  | Internal identifier of the sales order. |
 | `sale_agent.name` | string |  | Display name of the sales agent. |
 | `customer.name` | string |  | Display name of the customer. |
-| `status` | enum(`quote`, `open`, `closed`, `deleted`, `canceled`) |  | Current status of the sales order. |
+| `status` | enum(`Quote`, `Open`, `Closed`, `Deleted`, `Canceled`) |  | Current status of the sales order. |
 | `gross_sales` | number (double) |  | Sales value before discounts, taxes, and refunds. |
 | `discounts` | number (double) |  | Total discounts applied on this line. |
 | `refunds` | number (double) |  | Amount refunded against this line. |
@@ -7303,7 +7437,7 @@ request parameter that selects the report. Each is listed below.
 | `cancelled_quantity` | number (double) |  | Quantity that was cancelled on this line. |
 | `cancelled_gross_sales` | number (double) |  | Gross sales value of the cancelled quantity. |
 | `realized_cogs` | number (double) |  | Cost of goods sold that has been realized (for example on shipped quantity). |
-| `allocated_variant_type` | enum(`simple`, `bundle`, `component`) |  | The type of product variant on this line. |
+| `allocated_variant_type` | enum(`Simple`, `Bundle`, `Component`) |  | The type of product variant on this line. |
 
 </details>
 
@@ -7420,7 +7554,7 @@ request parameter that selects the report. Each is listed below.
 | `barcode` | string |  | The product's barcode. |
 | `image_url` | string |  | Image URL for the product on this line. |
 | `product_id` | integer (int32) |  | Internal identifier of the product on this line. |
-| `line_type` | enum(`order_item`, `landed_cost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
+| `line_type` | enum(`OrderItem`, `LandedCost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
 | `customer.name` | string |  | Display name of the customer. |
 | `quantity` | number (double) |  | Quantity invoiced on this line. |
 | `gross_amount` | number (double) |  | Invoiced value before discounts and tax. |
@@ -7524,6 +7658,7 @@ request parameter that selects the report. Each is listed below.
 | `location.is_deleted` | boolean |  | Whether the location has been deleted in the source system. |
 | `sale_agent.name` | string |  | Display name of the sales agent. |
 | `customer.name` | string |  | Display name of the customer. |
+| `customer_business_type` | enum(`Wholesale`, `Retailer`) |  | Business type of the customer. Null when the customer could not be resolved. |
 | `gross_amount` | number (double) |  | Order value before discounts and tax. |
 | `discount` | number (double) |  | Total discount applied to the order. |
 | `tax` | number (double) |  | Total tax on the order. |
@@ -7592,9 +7727,9 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
-29 endpoints.
+30 endpoints.
 
 ### GET /v1/sale_orders
 
@@ -7611,13 +7746,13 @@ and billing lifecycle in one call.
 | `created_at_min` | query | string (date-time) |  | Enter a specific creation date for a sales order to return records created after that date. (ISO 8601 format) |
 | `created_at_max` | query | string (date-time) |  | Enter a specific creation date for a sales order to return records created before that date. (ISO 8601 format) |
 | `expand` | query | string |  | Comma separated values of properties to expand on and include in the response. Commonly used values: `customer`, `customer.addresses`, `invoices`, `shipments`, `refunds`, `returns`, `addresses`, `custom_fields`, and `line_items.product_variant` to include each line item's variant details (sku, name, cost, image). Also supports `sale_agent`, `price_list`, `allocations`, `deposits`, `related_orders`, `invoices.invoice_items`, and `invoices.custom_items`, matching the single sale order GET endpoint. |
-| `status[]` | query | enum(`quote`, `open`, `closed`, `canceled`)[] |  | Sales order status to apply |
+| `status[]` | query | enum(`Quote`, `Open`, `Closed`, `Canceled`)[] |  | Sales order status to apply |
 | `updated_at_min` | query | string (date-time) |  | Enter a specific update date for a sales order to return records updated after that date |
 | `updated_at_max` | query | string (date-time) |  | Enter a specific update date for a sales order to return records updated before that date. |
-| `shipping_status[]` | query | enum(`failed`, `draft`, `picked`, `packed`, `completed`, `canceled`)[] |  | Sale order shipping status to apply |
-| `stock_status[]` | query | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `not_applicable`, `on_hold`)[] |  | Sale order stock status to apply |
-| `invoice_status[]` | query | enum(`draft`, `partial`, `completed`)[] |  | Sale order invoice status to apply |
-| `payment_status[]` | query | enum(`unpaid`, `partially_paid`, `fully_paid`)[] |  | Sale order payment status to apply |
+| `shipping_status[]` | query | enum(`Failed`, `Draft`, `Picked`, `Packed`, `Completed`, `Canceled`)[] |  | Sale order shipping status to apply |
+| `stock_status[]` | query | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `NotApplicable`, `OnHold`)[] |  | Sale order stock status to apply |
+| `invoice_status[]` | query | enum(`Draft`, `Partial`, `Completed`)[] |  | Sale order invoice status to apply |
+| `payment_status[]` | query | enum(`Unpaid`, `PartiallyPaid`, `FullyPaid`)[] |  | Sale order payment status to apply |
 | `assignee_ids[]` | query | integer (int32)[] |  | Filters sales orders based on the provided assignee IDs. |
 | `location_ids[]` | query | integer (int32)[] |  | Filters sales orders based on the provided location IDs. |
 | `variant_ids[]` | query | integer (int32)[] |  | Filters sales orders based on the provided variant IDs. |
@@ -7717,9 +7852,9 @@ order is ready, use the Allocate endpoint.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -7792,9 +7927,9 @@ order: its line items, payments, shipments, invoices, refunds, returns, and stat
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -7887,9 +8022,9 @@ and delivery date can no longer be changed once the order is closed.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8096,9 +8231,9 @@ invoicing can be performed on it, so use this when an order won't be fulfilled.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8169,9 +8304,9 @@ active work queue.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8247,9 +8382,9 @@ all-or-nothing operation. A custom line cannot be removed once it has been invoi
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8321,7 +8456,6 @@ request may produce several purchase orders, typically one per supplier.
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the purchase order. |
-| `type` | string |  | Type of the purchase order. |
 | `number` | string |  | Reference number of the purchase order. |
 | `created_at` | string (date-time) |  | Date and time when the purchase order was created. |
 | `last_updated_at` | string (date-time) |  | Date and time when the purchase order was last updated. |
@@ -8332,7 +8466,7 @@ request may produce several purchase orders, typically one per supplier.
 | `billing_status` | string |  | Current billing status of the purchase order. |
 | `receiving_status` | string |  | Current receiving status of the purchase order. |
 | `payment_status` | string |  | Current payment status of the purchase order. |
-| `sub_type` | string |  | Sub-type of the purchase order. |
+| `type` | enum(`RegularPO`, `FreightPO`, `DropShipPo`) |  | Type of the purchase order: `RegularPO`, `FreightPO` or `DropShipPo`. |
 | `shipping_location_id` | integer (int32) |  | ID of the location where the order will be shipped to. |
 | `billing_location_id` | integer (int32) |  | ID of the location where the order will be billed to. |
 | `price_list_id` | integer (int32) |  | Optional price list ID associated with the purchase order. |
@@ -8356,6 +8490,7 @@ request may produce several purchase orders, typically one per supplier.
 | `drop_ship_order` | DropShipOrder |  | Represents the sale order a drop-ship purchase order was raised for, including its ID, number, status, customer name, and shipping address. |
 | `deposits` | SupplierDepositBasic[] |  | List of supplier deposits recorded against the order. Only present when requested via `expand=deposits`. |
 | `refunds` | SupplierRefund[] |  | List of supplier refunds recorded against the order. Only present when requested via `expand=refunds`. |
+| `related_orders` | RelatedOrder[] |  | Other orders linked to this purchase order — for example a back-order it's linked to, or the sale order it drop-ships for. Only present when requested via `expand=related_orders`. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/sale_orders/{id}/drop_ship' \
@@ -8449,9 +8584,9 @@ never copied.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8567,9 +8702,9 @@ all-or-nothing operation. A line item cannot be removed once it has been shipped
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8705,9 +8840,9 @@ fulfillment and billing. This is the step that promotes a draft into your live o
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8777,9 +8912,9 @@ and needs further changes before it re-enters the active flow.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -8851,9 +8986,9 @@ manually in Qoblex.
 | `total_refund` | number (double) |  | The total amount refunded for the order. |
 | `payment_status` | string |  | Current state of a payment in a transaction or order process. |
 | `reference_id` | string |  | A secondary reference identifier, often used for cross-system linking. |
-| `stock_status` | enum(`awaiting_stock`, `ready_to_ship`, `fulfilled`, `partially_received`, `received`, `not_applicable`, `on_hold`) |  | Current availability of a product in inventory. |
-| `invoicing_status` | enum(`draft`, `partial`, `completed`) |  | Tracks the invoicing stage of the order. |
-| `refund_status` | enum(`draft`, `partial`, `completed`) |  | Current state of a refund in its lifecycle. |
+| `stock_status` | enum(`AwaitingStock`, `ReadyToShip`, `Fulfilled`, `PartiallyReceived`, `Received`, `NotApplicable`, `OnHold`) |  | Current availability of a product in inventory. |
+| `invoicing_status` | enum(`Draft`, `Partial`, `Completed`) |  | Tracks the invoicing stage of the order. |
+| `refund_status` | enum(`Draft`, `Partial`, `Completed`) |  | Current state of a refund in its lifecycle. |
 | `source_name` | string |  | The name of the channel or source that generated the order. |
 | `attachments` | OrderAttachment[] |  | A list of files attached to the order (e.g. PDFs, images). |
 | `reference` | string |  | A free-text reference note attached to the order. |
@@ -9002,6 +9137,37 @@ curl -sS 'https://api.qoblex.com/v1/sale_orders/import_from_channel' \
   -d '{ }'
 ```
 
+### GET /v1/sale_orders/linkable_orders
+
+**Search Linkable Orders**
+
+Searches across your sale, purchase, and production orders using a QueryKit `filters` expression
+(e.g. matching on `number` or `contact.name`). Use this to find candidate orders to link to a
+sale order, for example the purchase order that drop-ships it. Restrict to specific order types and
+exclude ids (typically the sale order you're linking from, plus any orders already linked to it) to
+narrow the results to orders that are actually eligible to be linked.
+
+| Parameter | In | Type | Required | Description |
+| --- | --- | --- | --- | --- |
+| `filters` | query | string |  | Filters to apply to the search: property operator value. Supported properties: - `id` - `number` - `author_name` - `status` - `type` - `sub_type` - `created_at` Supported operators: `==` (equals), `!=` (not equals), `@=*` (contains, case-insensitive), `>=` (greater than or equal), `<=` (less than or equal) String values must be double-quoted. Combine multiple filters with `,` (AND) or `\|` (OR), with a space on each side of the operator. A free-text search box should filter on both `number` and `author_name`, e.g. `number@=*"PO-001" \| author_name@=*"PO-001"`. |
+| `types` | query | string |  | Comma-separated list of order types to restrict the search to. Omit to search across all order types. Supported values: `Sale`, `Purchase`, `ProductionAssembly`, `ProductionDisassembly`. |
+| `exclude_order_ids` | query | string |  | Comma-separated list of order ids to exclude from the results — typically the order you're linking from, plus any orders already linked to it. |
+| `page` | query | integer (int32) |  | Specifies the page number for pagination. |
+| `sort_by` | query | string |  | Sorting to apply to the results: prefix with - for descending, no prefix for ascending. Defaults to `-created_at` (newest first) when omitted. Supported properties: `id`, `number`, `author_name`, `created_at`. |
+
+**Response** `200` `LinkableOrderListResponse`
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `lines` | LinkableOrder[] |  | The list of items. |
+| `count` | integer (int32) |  | The total number of items in the list. |
+| `filtered_count` | integer (int32) |  | The total number of items in the list after applying filters, if any. |
+
+```bash
+curl -sS 'https://api.qoblex.com/v1/sale_orders/linkable_orders' \
+  -H 'qoblex-x-api-key: '"$QOBLEX_API_KEY"
+```
+
 ### GET /v1/sale_orders/preview_purchase_orders
 
 **Preview Purchase Orders From Sale Orders**
@@ -9112,7 +9278,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 1 endpoint.
 
@@ -9128,7 +9294,7 @@ Returns the payment terms configured on your account, such as Net 30 or Due on r
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the payment term. |
 | `name` | string |  | Name of the payment term shown to customers and suppliers. |
-| `type` | enum(`days_net`, `days_after_e_o_m`, `days_e_o_m_xth_day`) |  | How the due date is calculated: from the invoice date, or relative to the end of the month. |
+| `type` | enum(`days_net`, `days_after_eom`, `days_eom_xth_day`) |  | How the due date is calculated: from the invoice date, or relative to the end of the month. |
 | `display_type` | string |  | Human-readable description of how the due date is calculated. |
 | `days` | integer (int32) |  | Number of days until payment is due, counted per the payment term's type. |
 | `months` | integer (int32) |  | Number of months added before the day-count above is applied. Zero when not used. |
@@ -9148,7 +9314,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 10 endpoints.
 
@@ -9633,7 +9799,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 6 endpoints.
 
@@ -9895,7 +10061,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 5 endpoints.
 
@@ -10179,7 +10345,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 5 endpoints.
 
@@ -10341,7 +10507,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 3 endpoints.
 
@@ -10368,7 +10534,7 @@ the transfer is authorized.
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the created transfer. |
 | `number` | string |  | Human-readable reference for the transfer, for example `TR-000000123`. |
-| `status` | enum(`draft`, `received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
+| `status` | enum(`Draft`, `Received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
 | `source_location` | string |  | Name of the location stock is being transferred from. |
 | `destination_location` | string |  | Name of the location stock is being transferred to. |
 | `transfer_date` | string (date-time) |  | Date and time when the transfer was created. |
@@ -10401,7 +10567,7 @@ assign the batches being shipped via `POST /{id}/batches` before authorizing.
 | --- | --- | --- | --- |
 | `id` | integer (int32) |  | Unique identifier of the created transfer. |
 | `number` | string |  | Human-readable reference for the transfer, for example `TR-000000123`. |
-| `status` | enum(`draft`, `received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
+| `status` | enum(`Draft`, `Received`) |  | Current status of the transfer: `Draft` while it can still be edited, or `Received` once it has been authorized and the stock has moved to the destination. |
 | `source_location` | string |  | Name of the location stock is being transferred from. |
 | `destination_location` | string |  | Name of the location stock is being transferred to. |
 | `transfer_date` | string (date-time) |  | Date and time when the transfer was created. |
@@ -10453,7 +10619,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 2 endpoints.
 
@@ -10521,7 +10687,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 4 endpoints.
 
@@ -10654,7 +10820,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 6 endpoints.
 

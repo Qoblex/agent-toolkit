@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 12 endpoints.
 
@@ -65,6 +65,7 @@ inventory - Warehouse locations only can be adjusted. New adjustments always sta
 | `line_items` | AdjustmentItemDto[] |  | The line items created or modified by this operation. Only items touched by the request are included; unchanged lines are omitted. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -74,7 +75,7 @@ inventory - Warehouse locations only can be adjusted. New adjustments always sta
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -102,6 +103,7 @@ stocktake and its current state.
 | --- | --- | --- | --- |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -111,7 +113,7 @@ stocktake and its current state.
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -150,6 +152,7 @@ single request.
 | `line_items` | AdjustmentItemDto[] |  | The line items created or modified by this operation. Only items touched by the request are included; unchanged lines are omitted. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -159,7 +162,7 @@ single request.
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -217,6 +220,7 @@ allocations in `line_items` and authorize in one request, instead of a separate 
 | --- | --- | --- | --- |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -226,7 +230,7 @@ allocations in `line_items` and authorize in one request, instead of a separate 
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -297,6 +301,7 @@ is never modified.
 | `line_items` | AdjustmentItemDto[] |  | The line items created or modified by this operation. Only items touched by the request are included; unchanged lines are omitted. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -306,7 +311,7 @@ is never modified.
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash
@@ -332,8 +337,8 @@ Filterable/sortable properties: `id`, `product_variant.name`, `sku`,
 | --- | --- | --- | --- | --- |
 | `id` | path | integer (int64) | yes | The unique identifier of the adjustment. For example, `1024`. |
 | `page` | query | integer (int32) |  | Page number to return. |
-| `filters` | query | string |  | A filter expression used to narrow the results, for example `name@=shirt,quantity>10`. See the Filtering and sorting section in the API overview for the full list of operators and syntax. |
-| `sort_by` | query | string |  | A sort expression: a comma-separated list of fields, each optionally prefixed with `-` for descending order. See the Filtering and sorting section in the API overview. |
+| `filters` | query | string |  | A filter expression used to narrow the results. Filterable fields: - `id` - `adjustment_id` - `product_variant.id`, `product_variant.product_id`, `product_variant.name`, `product_variant.sku`, `product_variant.barcode`, `product_variant.is_batch_tracked` - `reconciliation_status` — `Pending`, `Resolved` or `Conflict`. - `previous_quantity`, `quantity`, `previous_cost`, `cost`, `quantity_variance`, `cost_variance` - `count_agreement` — `Agreed` or `Disagreed`. |
+| `sort_by` | query | string |  | A sort expression: a comma-separated list of fields, each optionally prefixed with `-` for descending order. `count_agreement` is filter-only and cannot be sorted on. |
 | `expand` | query | string |  | Comma-separated list of relations to expand in the response. Supported values: - `session_lines`: include stocktake scan lines recorded per user for each item - `batch_usages`: include batch/lot allocations recorded for each batch-tracked item |
 
 **Response** `200` `AdjustmentItemDtoListResponse`
@@ -386,8 +391,11 @@ Every line to reconcile is listed in `items` by `line_item_id`. By default
 (`strategy: SetQuantity`) the caller also supplies `final_quantity` per line, as a
 single admin decision typed for one line at a time. To reconcile several selected lines at
 once without typing a quantity for each one, set `strategy` to `AcceptScanner`,
-`Merge`, `AcceptSystem`, or `AcceptSuggestion`; `final_quantity` is then
-ignored and the final quantity for each line is computed from the scanners' counts instead.
+`Merge`, `AcceptSystem`, `AcceptSuggestion`, `AcceptMin`, or `AcceptMax`;
+`final_quantity` is then ignored and the final quantity for each line is computed from the
+scanners' counts instead. `Merge` sums the scanners' counts, for stocktakes where each
+scanner counted a different part of the location; `AcceptMin` and `AcceptMax` take the
+lowest and the highest count, for stocktakes where scanners counted the same stock and disagreed.
 A line that cannot be resolved with the chosen strategy (for example, the chosen scanner
 never counted it) is skipped rather than failing the request, and reported back in
 `skipped_lines`.
@@ -400,7 +408,7 @@ never counted it) is skipped rather than failing the request, and reported back 
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `strategy` | enum(`set_quantity`, `accept_scanner`, `merge`, `accept_system`, `accept_suggestion`) |  | How the final quantity is determined for each line in `items`. Defaults to `SetQuantity`, which writes the `final_quantity` supplied for each line. The other strategies ignore `final_quantity` and compute it from the scanners' counts instead. |
+| `strategy` | enum(`SetQuantity`, `AcceptScanner`, `Merge`, `AcceptSystem`, `AcceptSuggestion`, `AcceptMin`, `AcceptMax`) |  | How the final quantity is determined for each line in `items`. Defaults to `SetQuantity`, which writes the `final_quantity` supplied for each line. The other strategies ignore `final_quantity` and compute it from the scanners' counts instead. |
 | `user_id` | integer (int32) |  | The user whose scan counts to use. Required when `strategy` is `AcceptScanner`. |
 | `items` | ReconcileAdjustmentItem[] |  | The lines to reconcile. Every line is identified by `line_item_id`; `final_quantity` is required only when `strategy` is `SetQuantity` and is otherwise ignored, since the other strategies compute the final quantity from the scanners' counts. Lines that cannot be resolved with the chosen strategy are skipped and reported in the response instead of failing the whole request. |
 
@@ -414,6 +422,7 @@ never counted it) is skipped rather than failing the request, and reported back 
 | `skipped_lines` | SkippedReconciliationLine[] |  | Lines that could not be reconciled with the chosen strategy, and why. Every line requested by a `SetQuantity` reconcile is always applied, so this is only ever populated for the other bulk strategies. |
 | `comments` | string |  | Additional notes or comments about the adjustment. |
 | `author_id` | integer (int64) |  | ID of the user who created the adjustment. |
+| `agents` | AdjustmentAgent[] |  | The users who have recorded a stocktake count on this adjustment, across all of its line items, with the requesting user first. Empty when nobody has counted it yet. |
 | `id` | integer (int64) |  | Unique identifier of the adjustment. |
 | `number` | string |  | Reference number of the adjustment. |
 | `created_at` | string (date-time) |  | The date and time when the adjustment was created. |
@@ -423,7 +432,7 @@ never counted it) is skipped rather than failing the request, and reported back 
 | `total` | number (double) |  | Total monetary of the adjustment. |
 | `cost_variance` | number (double) |  | Total value impact of quantity variances across all adjustment lines, calculated at the cost of each item at reconciliation time. Null when the adjustment has not been reconciled. |
 | `version` | string |  | The version of the adjustment. |
-| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). |
+| `type` | string |  | Whether the adjustment is Simple (final quantities set directly, no reconciliation) or Advanced (goes through the scan-session/reconciliation workflow before authorization). This is derived, not chosen: an adjustment starts Simple and is promoted to Advanced once a second agent records a count on it. The promotion is permanent. |
 | `location` | AdjustmentLocation |  | The location associated with the adjustment. |
 
 ```bash

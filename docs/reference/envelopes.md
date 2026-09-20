@@ -4,7 +4,7 @@ Generated from the spec. Two things vary per endpoint and neither can be inferre
 the last endpoint you called: the key that holds the records, and how you ask for the
 next page.
 
-## Paginated lists (23)
+## Paginated lists (25)
 
 The records sit under the key named here. `filtered_count` is the total after filters
 and is what you page against.
@@ -24,12 +24,14 @@ and is what you page against.
 | `/v1/products/{id}/variants` | `data` | `limit` + `offset` | `data`, `limit`, `offset`, `total_count` |
 | `/v1/products/overview` | `data` | `offset` | `data`, `limit`, `offset`, `total_count` |
 | `/v1/purchase_orders` | `lines` | `page` (zero-based) | `lines`, `count`, `filtered_count` |
+| `/v1/purchase_orders/linkable_orders` | `lines` | `page` (zero-based) | `lines`, `count`, `filtered_count` |
 | `/v1/quotes` | `quotes` | `page` (zero-based) | `count`, `filtered_count`, `quotes` |
 | `/v1/reporting/forecasting` | `lines` | `page` (zero-based) | `count`, `filtered_count`, `has_next_page`, `lines`, `summary` |
 | `/v1/reporting/inventory` | `lines` | `page` (zero-based) | `count`, `filtered_count`, `has_next_page`, `lines`, `summary` |
 | `/v1/reporting/purchases` | `lines` | `page` (zero-based) | `count`, `filtered_count`, `has_next_page`, `lines`, `summary` |
 | `/v1/reporting/sales` | `lines` | `page` (zero-based) | `count`, `filtered_count`, `has_next_page`, `lines`, `summary` |
 | `/v1/sale_orders` | `sale_orders` | `page` (zero-based) | `count`, `filtered_count`, `sale_orders` |
+| `/v1/sale_orders/linkable_orders` | `lines` | `page` (zero-based) | `lines`, `count`, `filtered_count` |
 | `/v1/suppliers` | `lines` | `page` (zero-based) | `lines`, `count`, `filtered_count` |
 | `/v1/variants` | `variants` | `page` (zero-based) | `count`, `filtered_count`, `variants` |
 | `/v1/variants/{id}/suppliers` | `suppliers` | `page` (zero-based) | `count`, `filtered_count`, `suppliers` |

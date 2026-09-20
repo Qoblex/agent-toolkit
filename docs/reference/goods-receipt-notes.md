@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 7 endpoints.
 
@@ -243,7 +243,7 @@ several batches, and set expiry dates on batches where that applies.
 | `created_at` | string (date-time) |  | Timestamp when the batch record was created. |
 | `authorized_at` | string (date-time) |  | Timestamp when the batch transaction was authorized. |
 | `closing_quantity` | number (double) |  | Total stock quantity in this batch after the transaction. |
-| `type` | enum(`none`, `transfer`, `adjustment`, `shipment`, `goods_receipt_note`, `assembly_order`, `reverse_shipment`, `sale_return`, `supplier_return`) |  | Type of inventory transaction. |
+| `type` | enum(`None`, `Transfer`, `Adjustment`, `Shipment`, `GoodsReceiptNote`, `AssemblyOrder`, `ReverseShipment`, `SaleReturn`, `SupplierReturn`) |  | Type of inventory transaction. |
 
 ```bash
 curl -sS 'https://api.qoblex.com/v1/purchase_orders/{id}/goods_receipt_notes/{grn_id}/batches' \

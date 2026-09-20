@@ -5,7 +5,7 @@ This repo is what a coding agent needs to build against its API: the whole v1 re
 plain markdown, a Claude skill, a small client, and four scripts that work.
 
 [![test](https://github.com/qoblex/agent-toolkit/actions/workflows/check.yml/badge.svg)](https://github.com/qoblex/agent-toolkit/actions/workflows/check.yml)
-[![API v1](https://img.shields.io/badge/Qoblex%20API-v1%20·%20197%20endpoints-1a202c)](https://api.qoblex.com/)
+[![API v1](https://img.shields.io/badge/Qoblex%20API-v1%20·%20201%20endpoints-1a202c)](https://api.qoblex.com/)
 [![OpenAPI 3.0.1](https://img.shields.io/badge/OpenAPI-3.0.1-6b46c1)](https://api.qoblex.com/swagger/v1/swagger.json)
 [![node](https://img.shields.io/badge/node-%E2%89%A518-43853d)](package.json)
 [![MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -87,7 +87,7 @@ The prompts are in [`examples/README.md`](examples/README.md).
 | --- | --- |
 | **[AGENTS.md](AGENTS.md)** | **The brief.** Base URL, auth, the rate limit, and the eight mistakes that cost an afternoon. If you read one file, read this one. |
 | [docs/conventions.md](docs/conventions.md) | Paging, filtering, sorting, expanding, errors, rate limits |
-| [docs/reference/index.md](docs/reference/index.md) | All 197 integration endpoints in one table |
+| [docs/reference/index.md](docs/reference/index.md) | All 201 integration endpoints in one table |
 | [docs/reference/envelopes.md](docs/reference/envelopes.md) | Which key holds the records, and how each endpoint pages |
 | [skills/qoblex/SKILL.md](skills/qoblex/SKILL.md) | A Claude skill for the API |
 | [llms.txt](llms.txt) / [llms-full.txt](llms-full.txt) | The whole thing in the shape a model reads |
@@ -117,7 +117,7 @@ guess from how REST APIs usually behave. [AGENTS.md](AGENTS.md) has the other fo
 
 ## What the API covers
 
-197 endpoints across 30 resource groups: products and variants, stock and adjustments, sale
+201 endpoints across 30 resource groups: products and variants, stock and adjustments, sale
 orders through allocation, picking, packing and dispatch, invoices and payments, purchase
 orders through approval, goods receipt, bills and supplier payments, manufacturing orders,
 bills of materials and kits, batch and lot traceability with expiry, custom fields, and

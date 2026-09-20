@@ -6,7 +6,7 @@ Base URL `https://api.qoblex.com`. Every request carries the `qoblex-x-api-key` 
 [conventions](../conventions.md) for paging, filtering, expanding and rate limits.
 
 A blank **Required** cell means the spec does not say, not that the field is optional:
-only 6 of 355 schemas declare one. The `400` response names the fields it rejected.
+only 6 of 361 schemas declare one. The `400` response names the fields it rejected.
 
 5 endpoints.
 
@@ -90,7 +90,7 @@ request parameter that selects the report. Each is listed below.
 | `product.name` | string |  | Display name of the product. |
 | `sku` | string |  | The variant's SKU. |
 | `barcode` | string |  | The variant's barcode. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Current lifecycle state of the variant (for example active or archived). |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Current lifecycle state of the variant (for example active or archived). |
 | `quantity` | number (double) |  | Units sold over the historical period being analysed. |
 | `quantity_returned` | number (double) |  | Units returned by customers over the historical period. |
 | `cancelled_quantity` | number (double) |  | Units on cancelled orders over the historical period. |
@@ -101,8 +101,8 @@ request parameter that selects the report. Each is listed below.
 | `projected_stock` | ForecastingProjectedStock[] |  | Week-by-week projection of expected stock on hand across the forecast horizon. |
 | `projected_incomings` | ForecastingIncomingPeriod[] |  | Incoming stock expected to arrive during the forecast horizon, by period. |
 | `projected_purchase_orders` | ForecastingProjectedPurchaseOrder[] |  | Suggested purchase orders to place to avoid running out of stock. |
-| `variant_type` | enum(`simple`, `bundle`, `component`) |  | Whether the variant is a simple item, a bundle, or a bundle component. |
-| `forecast_method` | enum(`historical_average_weekly_sales`, `seasonal`, `trend`) |  | The forecasting method used to project demand for this variant. |
+| `variant_type` | enum(`Simple`, `Bundle`, `Component`) |  | Whether the variant is a simple item, a bundle, or a bundle component. |
+| `forecast_method` | enum(`HistoricalAverageWeeklySales`, `Seasonal`, `Trend`) |  | The forecasting method used to project demand for this variant. |
 | `stockout_days` | integer (int32) |  | Number of days the variant was out of stock during the historical period. |
 | `total_sales` | number (double) |  | Total sales revenue for the variant over the historical period. |
 | `margin` | number (double) |  | Total profit margin for the variant over the historical period. |
@@ -160,10 +160,10 @@ it is moving.
 | `count` | integer (int32) |  | Total number of report records available. |
 | `filtered_count` | integer (int32) |  | Number of report records after filters are applied. |
 | `has_next_page` | boolean |  | Whether another page of results exists, when pagination applies. |
-| `lines` | StockMovementLineItem \| GroupedStockMovementLineItem \| StockOnHandInventoryItem \| InventoryItem \| InventoryTurnoverLineItem \| GroupedInventoryTurnoverLineItem \| InventoryReorderItem \| InventoryAgingLineItem \| GroupedInventoryAgingLineItem[] |  | The report rows. Which shape you get depends on the report_type you requested; each option below corresponds to a report type (its grouped variant is used when you group the report). |
+| `lines` | StockMovementLineItem \| GroupedStockMovementLineItem \| StockOnHandInventoryItem \| GroupedInventoryItem \| InventoryItem \| GroupedAllocationItem \| InventoryTurnoverLineItem \| GroupedInventoryTurnoverLineItem \| InventoryReorderItem \| InventoryAgingLineItem \| GroupedInventoryAgingLineItem[] |  | The report rows. Which shape you get depends on the report_type you requested; each option below corresponds to a report type (its grouped variant is used when you group the report). |
 | `summary` | StockMovementSummary \| StockOnHandInventoryItemSummary |  | Aggregated totals for the report, present when a summary is requested and available for the report type. |
 
-`lines` is one of 9 row shapes, chosen by the
+`lines` is one of 11 row shapes, chosen by the
 request parameter that selects the report. Each is listed below.
 
 <details>
@@ -204,7 +204,7 @@ request parameter that selects the report. Each is listed below.
 | `manufactured_value` | number (double) |  | Value of stock produced through manufacturing during the period. |
 | `transfer_quantity` | number (double) |  | Net quantity moved between locations during the period. |
 | `transfer_value` | number (double) |  | Net value moved between locations during the period. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 
 </details>
 
@@ -258,7 +258,7 @@ request parameter that selects the report. Each is listed below.
 | `brand.dim_id` | integer (int64) |  | Identifier of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
 | `product_type.dim_id` | integer (int64) |  | Identifier of the product type. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `supplier.name` | string |  | Display name of the supplier. |
 | `supplier.dim_id` | integer (int64) |  | Identifier of the supplier. |
 | `updated_at` | string (date-time) |  | When this product's stock was last updated. |
@@ -281,6 +281,22 @@ request parameter that selects the report. Each is listed below.
 </details>
 
 <details>
+<summary><code>GroupedInventoryItem</code></summary>
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `grouping_key` | object |  | The value this group is grouped by. |
+| `grouping_by_dim` | IGroupingDim |  |  |
+| `total_quantity` | number (double) |  | Total quantity of stock on hand for this group. |
+| `allocated_total_quantity` | number (double) |  | Total quantity reserved for open orders in this group. |
+| `available_total_quantity` | number (double) |  | Total quantity available to sell in this group after allocations. |
+| `incoming_total_quantity` | number (double) |  | Total quantity expected in from incoming purchase orders for this group. |
+| `buffer_total_quantity` | number (double) |  | Total buffer stock held back as a safety level for this group. |
+| `inventory_levels` | InventoryLevel[] |  | Per-location breakdown of stock levels for this group. |
+
+</details>
+
+<details>
 <summary><code>InventoryItem</code></summary>
 
 | Field | Type | Required | Description |
@@ -293,7 +309,7 @@ request parameter that selects the report. Each is listed below.
 | `image_url` | string |  | Image of the product. |
 | `barcode` | string |  | The product's barcode. |
 | `sku` | string |  | The product's SKU. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `brand.name` | string |  | Display name of the brand. |
 | `brand.dim_id` | integer (int64) |  | Identifier of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
@@ -310,6 +326,30 @@ request parameter that selects the report. Each is listed below.
 | `requested_quantity` | number (double) |  | Quantity requested across open orders. |
 | `on_back_order_quantity` | number (double) |  | Quantity on back order that could not be fulfilled from stock. |
 | `allocation_levels` | AllocationLevel[] |  | Per-order breakdown of how this product's stock is allocated. |
+
+</details>
+
+<details>
+<summary><code>GroupedAllocationItem</code></summary>
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `grouping_key` | object |  |  |
+| `grouping_by_dim` | IGroupingDim |  |  |
+| `brand_dim_ids` | integer (int64)[] |  |  |
+| `supplier_dim_ids` | integer (int64)[] |  |  |
+| `customer_dim_ids` | integer (int64)[] |  |  |
+| `integration_dim_ids` | integer (int64)[] |  |  |
+| `product_type_dim_ids` | integer (int64)[] |  |  |
+| `sale_channel_dim_ids` | integer (int64)[] |  |  |
+| `user_dim_ids` | integer (int64)[] |  |  |
+| `location_dim_ids` | integer (int64)[] |  |  |
+| `sale_order_dim_ids` | integer (int64)[] |  |  |
+| `production_order_dim_ids` | integer (int64)[] |  |  |
+| `variant_dim_ids` | integer (int64)[] |  |  |
+| `allocated_quantity` | number (double) |  |  |
+| `requested_quantity` | number (double) |  |  |
+| `on_back_order_quantity` | number (double) |  |  |
 
 </details>
 
@@ -331,7 +371,7 @@ request parameter that selects the report. Each is listed below.
 | `product.name` | string |  | Display name of the product. |
 | `image_url` | string |  | Image of the product. |
 | `sku` | string |  | The product's SKU. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `barcode` | string |  | The product's barcode. |
 | `cogs` | number (double) |  | Cost of goods sold for this product during the period. |
 | `daily_soh` | number (double) |  | Average value of stock on hand per day over the period. |
@@ -378,7 +418,7 @@ request parameter that selects the report. Each is listed below.
 | `brand.dim_id` | integer (int64) |  | Identifier of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
 | `product_type.dim_id` | integer (int64) |  | Identifier of the product type. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `supplier.name` | string |  | Display name of the supplier. |
 | `supplier.id` | integer (int64) |  | Identifier of the supplier. |
 | `supplier.dim_id` | integer (int64) |  | Identifier of the supplier. |
@@ -415,7 +455,7 @@ request parameter that selects the report. Each is listed below.
 | `image_url` | string |  | Image of the product. |
 | `product_variant_id` | integer (int64) |  | Identifier of the product variant. |
 | `sku` | string |  | The product's SKU. |
-| `state` | enum(`draft`, `active`, `deleted`, `archived`) |  | Whether the product variant is active or archived. |
+| `state` | enum(`Draft`, `Active`, `Deleted`, `Archived`) |  | Whether the product variant is active or archived. |
 | `barcode` | string |  | The product's barcode. |
 | `value_aged_0_to_30_days` | number (double) |  | Stock value aged 0 to 30 days. |
 | `value_aged_31_to_60_days` | number (double) |  | Stock value aged 31 to 60 days. |
@@ -525,7 +565,7 @@ request parameter that selects the report. Each is listed below.
 | `product.dim_id` | integer (int64) |  | Identifier of the product variant this row rolls up to. |
 | `purchase.number` | string |  | The purchase order number. |
 | `created_on` | string (date-time) |  | The date the purchase order was created. |
-| `status` | enum(`draft`, `open`, `closed`, `deleted`) |  | The current status of the purchase order. |
+| `status` | enum(`Draft`, `Open`, `Closed`, `Deleted`) |  | The current status of the purchase order. |
 | `supplier.name` | string |  | The name of the supplier. |
 | `purchase_agent.name` | string |  | The name of the purchasing agent who placed the order. |
 | `brand.name` | string |  | The brand of the purchased product. |
@@ -564,9 +604,9 @@ request parameter that selects the report. Each is listed below.
 | `refund_date` | string (date-time) |  | The date the supplier refund was issued. |
 | `refund_tax` | number (double) |  | The tax credited on the supplier refund. |
 | `refund_amount` | number (double) |  | The amount credited on the supplier refund. |
-| `order_type` | enum(`regular`, `freight`, `drop_ship`) |  | The type of order this line belongs to. |
+| `order_type` | enum(`Regular`, `Freight`, `DropShip`) |  | The type of order this line belongs to. |
 | `purchase_order_id` | integer (int64) |  | Internal identifier of the purchase order this line belongs to. |
-| `line_type` | enum(`order_item`, `landed_cost`, `expense`) |  | The kind of line this row represents (for example an order, receipt, bill or return line). |
+| `line_type` | enum(`OrderItem`, `LandedCost`, `Expense`) |  | The kind of line this row represents (for example an order, receipt, bill or return line). |
 | `incoming_quantity` | number (double) |  | The quantity still expected to arrive from the supplier. |
 | `landed_cost_name` | string |  | The name of the landed cost applied to the line. |
 
@@ -647,7 +687,7 @@ request parameter that selects the report. Each is listed below.
 | `barcode` | string |  | The barcode of the purchased product. |
 | `created_at` | string (date-time) |  | The date the purchase order was created. |
 | `purchase.number` | string |  | The purchase order number. |
-| `status` | enum(`draft`, `open`, `closed`, `deleted`) |  | The current status of the purchase order. |
+| `status` | enum(`Draft`, `Open`, `Closed`, `Deleted`) |  | The current status of the purchase order. |
 | `purchase_agent.name` | string |  | The name of the purchasing agent who placed the order. |
 | `purchase_agent.dim_id` | integer (int64) |  | Identifier of the purchasing agent this row rolls up to. |
 | `supplier.dim_id` | integer (int64) |  | Identifier of the supplier this row rolls up to. |
@@ -910,8 +950,9 @@ request parameter that selects the report. Each is listed below.
 | `sale_order_id` | integer (int64) |  | Internal identifier of the sales order. |
 | `image_url` | string |  | Image URL for the product on this line. |
 | `product_id` | integer (int32) |  | Internal identifier of the product on this line. |
-| `status` | enum(`quote`, `open`, `closed`, `deleted`, `canceled`) |  | Current status of the sales order. |
+| `status` | enum(`Quote`, `Open`, `Closed`, `Deleted`, `Canceled`) |  | Current status of the sales order. |
 | `customer.name` | string |  | Display name of the customer. |
+| `customer_business_type` | enum(`Wholesale`, `Retailer`) |  | Business type of the customer. Null when the customer could not be resolved. |
 | `sale_agent.name` | string |  | Display name of the sales agent. |
 | `brand.name` | string |  | Display name of the brand. |
 | `product_type.name` | string |  | Display name of the product type. |
@@ -937,7 +978,7 @@ request parameter that selects the report. Each is listed below.
 | `margin_percentage` | number (double) |  | Margin as a percentage of net sales. |
 | `refund.number` | string |  | The refund number, if this line was refunded. |
 | `return.number` | string |  | The return number, if this line was returned. |
-| `return_type` | string |  | The type of return recorded for this line. |
+| `return_type` | enum(`None`, `Restock`, `NonRestock`, `Canceled`) |  | The type of return recorded for this line, or null when the line was not returned. |
 | `quantity_returned` | number (double) |  | Quantity returned on this line. |
 | `return_cogs` | number (double) |  | Cost of goods sold for the returned quantity. |
 | `refund_date` | string (date-time) |  | The date the refund was recorded. |
@@ -951,7 +992,7 @@ request parameter that selects the report. Each is listed below.
 | `shipment_cogs` | number (double) |  | Cost of goods sold for the shipped quantity. |
 | `invoice.number` | string |  | The invoice number, if this line was invoiced. |
 | `barcode` | string |  | The product's barcode. |
-| `line_type` | enum(`order_item`, `landed_cost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
+| `line_type` | enum(`OrderItem`, `LandedCost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
 | `invoice_date` | string (date-time) |  | The date the invoice was recorded. |
 | `invoice_quantity` | number (double) |  | Quantity invoiced on this line. |
 | `total_invoice` | number (double) |  | Total invoiced value for this line. |
@@ -1039,7 +1080,7 @@ request parameter that selects the report. Each is listed below.
 | `sale_order_id` | integer (int64) |  | Internal identifier of the sales order. |
 | `sale_agent.name` | string |  | Display name of the sales agent. |
 | `customer.name` | string |  | Display name of the customer. |
-| `status` | enum(`quote`, `open`, `closed`, `deleted`, `canceled`) |  | Current status of the sales order. |
+| `status` | enum(`Quote`, `Open`, `Closed`, `Deleted`, `Canceled`) |  | Current status of the sales order. |
 | `gross_sales` | number (double) |  | Sales value before discounts, taxes, and refunds. |
 | `discounts` | number (double) |  | Total discounts applied on this line. |
 | `refunds` | number (double) |  | Amount refunded against this line. |
@@ -1057,7 +1098,7 @@ request parameter that selects the report. Each is listed below.
 | `cancelled_quantity` | number (double) |  | Quantity that was cancelled on this line. |
 | `cancelled_gross_sales` | number (double) |  | Gross sales value of the cancelled quantity. |
 | `realized_cogs` | number (double) |  | Cost of goods sold that has been realized (for example on shipped quantity). |
-| `allocated_variant_type` | enum(`simple`, `bundle`, `component`) |  | The type of product variant on this line. |
+| `allocated_variant_type` | enum(`Simple`, `Bundle`, `Component`) |  | The type of product variant on this line. |
 
 </details>
 
@@ -1174,7 +1215,7 @@ request parameter that selects the report. Each is listed below.
 | `barcode` | string |  | The product's barcode. |
 | `image_url` | string |  | Image URL for the product on this line. |
 | `product_id` | integer (int32) |  | Internal identifier of the product on this line. |
-| `line_type` | enum(`order_item`, `landed_cost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
+| `line_type` | enum(`OrderItem`, `LandedCost`) |  | The kind of line this row represents (for example a product, custom, or shipping line). |
 | `customer.name` | string |  | Display name of the customer. |
 | `quantity` | number (double) |  | Quantity invoiced on this line. |
 | `gross_amount` | number (double) |  | Invoiced value before discounts and tax. |
@@ -1278,6 +1319,7 @@ request parameter that selects the report. Each is listed below.
 | `location.is_deleted` | boolean |  | Whether the location has been deleted in the source system. |
 | `sale_agent.name` | string |  | Display name of the sales agent. |
 | `customer.name` | string |  | Display name of the customer. |
+| `customer_business_type` | enum(`Wholesale`, `Retailer`) |  | Business type of the customer. Null when the customer could not be resolved. |
 | `gross_amount` | number (double) |  | Order value before discounts and tax. |
 | `discount` | number (double) |  | Total discount applied to the order. |
 | `tax` | number (double) |  | Total tax on the order. |

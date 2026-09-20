@@ -20,7 +20,7 @@ OpenAPI 3.0.1: https://api.qoblex.com/swagger/v1/swagger.json
 
 ## Reference
 
-- [Every endpoint](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/reference/index.md): all 197 integration endpoints in one table.
+- [Every endpoint](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/reference/index.md): all 201 integration endpoints in one table.
 - [List envelopes and paging](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/docs/reference/envelopes.md): which key holds the records, per endpoint.
 - [Full reference in one file](https://raw.githubusercontent.com/qoblex/agent-toolkit/main/llms-full.txt): every group, every operation, every field.
 
