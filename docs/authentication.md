@@ -62,5 +62,9 @@ export QOBLEX_API_KEY='...'
 curl -sS 'https://api.qoblex.com/v1/users/me' -H "qoblex-x-api-key: $QOBLEX_API_KEY"
 ```
 
-`GET /v1/users/me` is the cheapest way to check a key works. It returns the identity the
-key belongs to, which is also how you confirm you are pointed at the account you meant.
+`GET /v1/account` is the cheapest way to check a key works, and it names the account, which
+is how you confirm you are pointed at the one you meant.
+
+Not `GET /v1/users/me`: a key that belongs to an integration rather than to a team member
+has no user behind it, and that call answers `404 Resource not found` with
+`* User not found`. The key is fine; the check is wrong. Verified 2026-09-20.

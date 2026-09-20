@@ -17,8 +17,11 @@ Create API key**, and API access is a paid add-on that is active during the free
 Confirm which account you are on before doing anything that writes:
 
 ```bash
-curl -sS 'https://api.qoblex.com/v1/users/me' -H "qoblex-x-api-key: $QOBLEX_API_KEY"
+curl -sS 'https://api.qoblex.com/v1/account' -H "qoblex-x-api-key: $QOBLEX_API_KEY"
 ```
+
+Not `/v1/users/me`: an integration key has no user behind it and gets a `404`, which looks
+like a bad key and is not.
 
 ## The rules that bite
 

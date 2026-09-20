@@ -12,8 +12,9 @@ Paging     page=0 is the first page    up to 50 records
 Spec       spec/openapi.json           OpenAPI 3.0.1, 201 operations
 ```
 
-Check a key with `GET /v1/users/me`. It is the cheapest call in the API and tells you which
-account you are pointed at.
+Check a key with `GET /v1/account`. It names the account, so it tells you which one you are
+pointed at. Not `GET /v1/users/me`, which answers `404` for an integration key that has no
+user behind it, and reads as a broken key when it is not.
 
 ## Eight things to get right
 
