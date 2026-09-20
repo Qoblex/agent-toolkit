@@ -27,15 +27,33 @@ On `/v1/reporting/inventory`, `include` chooses what to compute: `lines` for the
 page of rows, `count` for the total across the filtered set, `summary` for the aggregate
 totals. Ask only for what you will read.
 
-## Dimensions are real but not in the document
+## Dimensions: not in the document, and not discoverable either
 
-`group_by`, `sort_by`, `dim_filters` and `fact_filters` all accept a fixed set of values
-per report, and none of those sets is published in the OpenAPI document yet. They are not
-free text and guessing will not work.
+`group_by`, `sort_by`, `dim_filters` and `fact_filters` accept a fixed set of values per
+report, and none of those sets is published. They are not free text.
 
-`GET /v1/reporting/filters` returns the filters available across the reports and takes a
-`type`, so it answers at runtime what the document does not answer at design time. Call it
-once while building, not on every run.
+**`GET /v1/reporting/filters` is the endpoint that would answer this, and it returns `500`
+on every input** (checked 2026-09-20, with and without `type`, on every documented value).
+So there is currently no way to discover a valid dimension. Treat the reports as usable
+without dimensions until that is fixed.
+
+Three behaviours to know while it is, because they differ and only one of them tells you
+anything:
+
+| | |
+| --- | --- |
+| `group_by` with a bad or unsupported value | `422`, with a useful message: `Grouping is not supported for Inventory Reorder Report.` |
+| `dim_filters` with a nonsense field | **`200`, silently ignored.** You get an unfiltered report that looks filtered |
+| `sort_by` with a field the endpoint lacks | `204`, no body at all. Your result set is empty and nothing says why |
+
+The middle one is the dangerous one: a report you believe is scoped to a warehouse or a
+brand, and is not, reads as a plausible answer. Until the dimensions are published, check a
+`dim_filters` expression changes `count` before trusting it.
+
+`GET /v1/variants/filters` does work, and answers for variants rather than reports: passing
+no `type` returns a `400` naming its own supported values (`suppliers`, `product_types`,
+`tags`, `brands`, `locations`, `variants`), which is a neat way to ask an endpoint what it
+takes.
 
 ## The questions people actually ask
 

@@ -36,6 +36,15 @@ export class QoblexError extends Error {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// An ISO timestamp the filters will actually match.
+//
+// `Date.prototype.toISOString()` emits milliseconds, and a filter value carrying fractional
+// seconds matches NOTHING on the endpoints that use the second filter dialect. It does not
+// error: `/v1/batches?filters=expires_at<=2028-02-02T14:55:44.042Z` answers 204 with no body
+// where the same instant without the `.042` answers 200 and 114 records. Measured
+// 2026-09-20. Always build a filter value with this.
+export const isoSeconds = (date = new Date()) => `${new Date(date).toISOString().slice(0, 19)}Z`;
+
 export class Qoblex {
   #nextSlot = 0;
 
@@ -126,11 +135,20 @@ export class Qoblex {
     return key ? payload[key] : [];
   }
 
+  // How many records the query matches in total, which is what you page against.
+  //
+  // `count` is that number, and it tracks the filter: /v1/variants answers 4873 unfiltered
+  // and 3290 with `filters=quantity<5`. `filtered_count` is NOT a total at all, it is the
+  // number of rows in the page you are holding, and it reads 50 on every page of every
+  // endpoint. The schema descriptions in the OpenAPI document say the opposite of both.
+  //
+  // Reading `filtered_count` as the total stops the walk after the first page, silently,
+  // with exactly one page of a 4873-record catalog in hand. Measured against a live
+  // account on 2026-09-20; no stub reproduced it, because the stub implemented the
+  // documented meaning.
   static total(payload) {
-    // `filtered_count` is the count after filters and is what you page against;
-    // `count` is the unfiltered total. Activity and the overviews use `total_count`.
     if (Array.isArray(payload)) return payload.length;
-    return payload?.filtered_count ?? payload?.total_count ?? payload?.count ?? null;
+    return payload?.count ?? payload?.total_count ?? null;
   }
 
   // Yields every record across pages, whichever way the endpoint pages.

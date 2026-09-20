@@ -6,8 +6,9 @@ next page.
 
 ## Paginated lists (25)
 
-The records sit under the key named here. `filtered_count` is the total after filters
-and is what you page against.
+The records sit under the key named here. Page against `count`, which is the total and
+tracks the filter. `filtered_count` is the row count of the page in hand, not a total,
+whatever the schema description says.
 
 | Path | Records under | Paging | All keys |
 | --- | --- | --- | --- |

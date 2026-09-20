@@ -12,7 +12,7 @@
 // the first thing this does is send one request to find out whether the filter is accepted.
 // An unsupported field is a `400`, which makes that probe reliable and cheap.
 import { readFile, writeFile } from 'node:fs/promises';
-import { client, QoblexError } from './lib/qoblex.mjs';
+import { client, QoblexError, isoSeconds } from './lib/qoblex.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) =>
@@ -31,9 +31,11 @@ const key = `${resource}:${field}`;
 // Overlap the window by two minutes. A record written while the previous run was mid
 // request carries a timestamp inside that run's window but arrives after it, and without
 // the overlap it is never seen again.
+// isoSeconds throughout: a filter value with milliseconds matches nothing on some
+// endpoints and does not error, so the poller would report "nothing changed" forever.
 const since = state[key]
-  ? new Date(new Date(state[key]).getTime() - 120_000).toISOString()
-  : new Date(Date.now() - 86_400_000).toISOString();
+  ? isoSeconds(new Date(state[key]).getTime() - 120_000)
+  : isoSeconds(Date.now() - 86_400_000);
 
 const filters = `${field}>=${since}`;
 

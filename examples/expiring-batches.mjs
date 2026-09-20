@@ -13,7 +13,7 @@
 //
 // Fields used, all from the batch list schema: id, number, expires_at, quantity,
 // reserved_quantity, cost, location, product_variant.
-import { client } from './lib/qoblex.mjs';
+import { client, isoSeconds } from './lib/qoblex.mjs';
 
 const args = process.argv.slice(2);
 const days = Number(args[args.indexOf('--days') + 1]) || 60;
@@ -31,7 +31,8 @@ const horizon = new Date(Date.now() + days * 86_400_000);
 
 // Filter and sort on the server. Pulling every batch and filtering here would cost a page
 // per 50 batches against a budget of 30 requests a minute.
-const filters = `expires_at<=${horizon.toISOString()}`;
+// isoSeconds, not toISOString: milliseconds in a filter value match nothing, silently.
+const filters = `expires_at<=${isoSeconds(horizon)}`;
 const rows = [];
 
 for await (const b of qoblex.paginate('/v1/batches', { filters, sort_by: 'expires_at' })) {

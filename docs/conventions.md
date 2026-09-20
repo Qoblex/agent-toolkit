@@ -53,8 +53,12 @@ The full table is generated into [reference/envelopes.md](reference/envelopes.md
 
 **Know when to stop.** List responses carry their totals:
 
-- `filtered_count` is the total after filters, and is the one to page against.
-- `count` is the total before filters.
+- **`count` is the total, and it is the one to page against.** It tracks the filter:
+  `/v1/variants` answers 4873 unfiltered and 3290 with `filters=quantity<5`.
+- **`filtered_count` is not a total.** It is the number of rows in the page you are
+  holding, and it reads 50 on every page of every endpoint. The schema descriptions in the
+  OpenAPI document say the reverse of both, so do not take them at their word here.
+  Measured against a live account, 2026-09-20.
 - `total_count` is what `/v1/activity` and the two overview endpoints use instead.
 - `has_next_page` appears on the reporting lists and is the direct answer.
 
@@ -67,9 +71,9 @@ minute's budget spent learning nothing.
 There is no single envelope. Four examples, all different:
 
 ```jsonc
-GET /v1/products         → { "count": 0, "filtered_count": 0, "products":    [] }
-GET /v1/sale_orders      → { "count": 0, "filtered_count": 0, "sale_orders": [] }
-GET /v1/purchase_orders  → { "count": 0, "filtered_count": 0, "lines":       [] }
+GET /v1/products         → { "count": 2649, "filtered_count": 50, "products":    [50 rows] }
+GET /v1/sale_orders      → { "count": 9238, "filtered_count": 50, "sale_orders": [50 rows] }
+GET /v1/purchase_orders  → { "count": 3572, "filtered_count": 50, "lines":       [50 rows] }
 GET /v1/activity         → { "total_count": 0, "prev": null, "next": null, "data": [] }
 ```
 
@@ -257,6 +261,23 @@ read the method off the reference rather than assuming REST convention.
 
 [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) everywhere, for example
 `2026-09-13T10:53:43-08:00`. URL-encode any date passed as a query parameter.
+
+**Never put milliseconds in a filter value.** A timestamp carrying fractional seconds
+matches nothing on the second-dialect endpoints, and it does not error:
+
+```text
+GET /v1/batches?filters=expires_at<=2028-02-02T14:55:44.042Z   → 204, no body
+GET /v1/batches?filters=expires_at<=2028-02-02T14:55:44Z       → 200, 114 records
+```
+
+This matters more than it looks, because JavaScript's `Date.prototype.toISOString()` emits
+milliseconds, so the obvious way to build the value is the broken one. Truncate to seconds:
+`` `${d.toISOString().slice(0, 19)}Z` ``. Measured 2026-09-20.
+
+**An unsupported `sort_by` field is also a silent 204** rather than a `400`:
+`sort_by=totalnonsensefld` on `/v1/batches` returns no body at all. So a sort on a field the
+endpoint does not have empties your result set without telling you. Check a new sort field
+returns rows before building on it.
 
 ## Versioning
 

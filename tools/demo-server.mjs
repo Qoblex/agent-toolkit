@@ -127,7 +127,9 @@ const server = createServer((req, res) => {
   const paged = (rows, key) => {
     const page = Number(q.get('page') ?? 0);
     const start = page * 50;
-    return { count: rows.length, filtered_count: rows.length, [key]: rows.slice(start, start + 50) };
+    // count is the total; filtered_count is this page's row count, as the live API answers.
+    const slice = rows.slice(start, start + 50);
+    return { count: rows.length, filtered_count: slice.length, [key]: slice };
   };
 
   switch (url.pathname) {

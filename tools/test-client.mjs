@@ -41,12 +41,16 @@ const server = createServer((req, res) => {
     // The common shape: zero-based `page`, records under a resource-named key.
     case '/v1/products': {
       const p = Number(url.searchParams.get('page') ?? 0);
-      return json({ count: 120, filtered_count: 120, products: page(p, 50, 120) });
+      // count is the total; filtered_count is the size of THIS page, as the live API
+      // answers. Setting both to the total is what let the paging bug through.
+      const rows = page(p, 50, 120);
+      return json({ count: 120, filtered_count: rows.length, products: rows });
     }
     // Same shape, different key. Purchase orders call the collection `lines`.
     case '/v1/purchase_orders': {
       const p = Number(url.searchParams.get('page') ?? 0);
-      return json({ count: 3, filtered_count: 3, lines: page(p, 50, 3) });
+      const short = page(p, 50, 3);
+      return json({ count: 3, filtered_count: short.length, lines: short });
     }
     // `limit` + `offset`, with a server-chosen page size that is not 50.
     case '/v1/products/1/variants': {
@@ -67,7 +71,8 @@ const server = createServer((req, res) => {
     // The reporting lists answer `has_next_page` outright.
     case '/v1/reporting/inventory': {
       const p = Number(url.searchParams.get('page') ?? 0);
-      return json({ count: 75, filtered_count: 75, has_next_page: p < 1, lines: page(p, 50, 75) });
+      const rep = page(p, 50, 75);
+      return json({ count: 75, filtered_count: rep.length, has_next_page: p < 1, lines: rep });
     }
     case '/v1/limited':
       return json({ ok: true });
